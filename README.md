@@ -1,215 +1,181 @@
-# Honey Batchr - Batch Printing Application
+# Honey Batchr
 
-A minimalist PyQt5 application for batch printing files with drag-and-drop support and context menu integration.
+A Windows batch printing application built with PyQt6. Matches the Adobe Acrobat Batch Print layout with N-up composition, per-file page configuration, live PDF preview, and theme switching.
+
+---
 
 ## Features
 
-- **Editable File List**: Add, remove, and organize files to print
-- **Drag & Drop**: Simply drag files onto the application window
-- **Windows Context Menu**: Right-click any file to add it to the print queue
-- **Print Settings**: 
-  - Printer selection
-  - Number of copies
-  - Color mode (Color, Grayscale, Monochrome)
-  - Double-sided printing
-  - Collate option
-- **Settings Persistence**: Your preferences are saved locally
-- **Minimalist Design**: Clean and simple UI with badger icon
+- **Batch file queue** — table view with Number, Name, Modified, Range, Copies, Size, Location, State columns
+- **Drag & drop** — drop files directly onto the file table
+- **N-up printing** — compose 1, 2, 4, 6, 8, 9, or 16 pages per sheet with configurable page order and margins
+- **Duplex printing** — flip on long edge or short edge via QPrinter (no admin rights required)
+- **Grayscale / color** — per-job color mode
+- **Per-file page configuration** — page range (`1,5-9,12`), odd/even subset, per-file copies, duplex override, reverse pages, live PDF preview with N-up sheet navigation
+- **PDF page count** — automatically reads page count from PDFs and shows range in the table
+- **Print engine** — PyMuPDF composes the N-up layout; QPrinter/QPainter sends it to the driver (duplex and color applied correctly without `SetPrinter`)
+- **Office/other formats** — Word, Excel, PowerPoint fall back to `ShellExecute printto`
+- **Theme switcher** — Settings > Theme: Fusion Light, Fusion Dark, Windows, WindowsVista (saved to config, applied before window opens)
+- **Settings persistence** — all print options saved to `%USERPROFILE%\.honeybatchr\config.json`
+- **Move up / Move down** — reorder files in the queue
+- **Context menu** — right-click a file row to remove, open, or open containing folder
 
-## Installation & Building
+---
 
-### Prerequisites
+## Requirements
 
-- Python 3.8 or higher
-- Windows OS (for context menu integration)
+- Windows 10/11
+- Python 3.11+
 
-### Quick Build
+### Python dependencies
 
-Simply run the build script:
-
-```bash
-build.bat
+```
+PyQt6>=6.4.0
+PyInstaller>=5.0.0
+Pillow>=9.0.0
+pywin32>=306
+pypdf>=4.0.0
+PyMuPDF>=1.23.0
 ```
 
-This will automatically:
-1. Check and install dependencies
-2. Generate application icons
-3. Build the executable with PyInstaller
-4. Create the distribution folder
-
-The executable will be created at: `dist\HoneyBatchr\HoneyBatchr.exe`
-
-### Manual Installation
-
-If you prefer to install dependencies manually:
+Install all:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Then build:
+---
+
+## Running
 
 ```bash
-python create_icons.py
-pyinstaller batch_print.spec
+python main.py
 ```
 
-## Usage
-
-### Running the Application
-
-**From Python:**
-```bash
-python batch_print_app.py
-```
-
-**From Executable:**
-- Navigate to `dist\HoneyBatchr\` and double-click `HoneyBatchr.exe`
-- Or use the `launch.bat` file
-
-### Adding Files to Print
-
-You can add files in three ways:
-
-1. **Click "Add Files"** button to open a file browser
-2. **Drag & Drop** files directly onto the application window
-3. **Right-click context menu** (after registering - see below)
-
-### Printing
-
-1. Add files to the list
-2. Configure print settings:
-   - Select printer
-   - Set number of copies
-   - Choose color mode
-   - Enable/disable double-sided printing
-   - Set collate option
-3. Click **"Print All"** button
-
-The app uses the system's default print handler for each file type.
-
-### Managing the File List
-
-Right-click any file in the list for options to:
-- Remove from list
-- Open the file
-- Open containing folder
-
-## Context Menu Integration
-
-### Register Context Menu (Requires Admin)
-
-After building the application, register it in the Windows context menu:
+Pass files as arguments to pre-load them (used by the Windows context menu):
 
 ```bash
-register_context_menu.bat
+python main.py "C:\docs\file1.pdf" "C:\docs\file2.pdf"
 ```
 
-**Requirements:** You must run this as Administrator.
+---
 
-This adds "Batch Print with Honey Batchr" to the right-click context menu for all files and folders.
-
-### Unregister Context Menu
-
-To remove the context menu entry:
+## Building
 
 ```bash
-unregister_context_menu.bat
+build.bat
 ```
 
-This must also be run as Administrator.
+Produces `dist\HoneyBatchr.exe` via PyInstaller.
 
-## Configuration
+---
 
-Settings are automatically saved to: `%USERPROFILE%\.honeybatchr\config.json`
+## Print Engine
 
-You can also click "Save Settings" in the application to save your current preferences.
+| File type | Render path |
+|-----------|-------------|
+| PDF, XPS, EPUB, CBZ, SVG | PyMuPDF → N-up compose → QPrinter/QPainter |
+| Images (JPG, PNG, BMP, TIF, GIF) | PyMuPDF → N-up compose → QPrinter/QPainter |
+| Word, Excel, PowerPoint, other | `ShellExecute printto` (best-effort, N-up not applied) |
+
+N-up layout, page borders, and margins are composed by PyMuPDF before the job reaches the printer. Duplex, color mode, and copy count are set through `QPrinter` — no admin rights or `SetPrinter` call needed.
+
+---
+
+## Page Configuration Options
+
+Click **Page Configuration Options...** (or select a file first) to open the per-file dialog:
+
+- **Preview** — live PDF rendering with N-up sheet layout, zoom info, slider navigation
+- **Print Range** — All pages, specific range (`1,5-9,12`), odd/even subset
+- **Print Specifications** — per-file copies, duplex, reverse pages
+
+Settings are stored on the file entry and applied during composition.
+
+---
 
 ## Project Structure
 
 ```
 HoneyBatchr/
-├── batch_print_app.py           # Main application
-├── create_icons.py              # Icon generation script
-├── batch_print.spec             # PyInstaller specification
-├── build.bat                    # Build script
-├── register_context_menu.bat    # Install context menu
-├── unregister_context_menu.bat  # Remove context menu
-├── requirements.txt             # Python dependencies
-├── resources/                   # Generated icons
-│   ├── badger.png
-│   ├── badger.ico
-│   └── badger_*.png
-└── dist/                        # Built application (after running build.bat)
-    └── HoneyBatchr/
-        ├── HoneyBatchr.exe      # Executable
-        ├── launch.bat           # Launch script
-        └── resources/
+├── main.py                      # Entire application
+├── requirements.txt
+├── batch_print.spec             # PyInstaller spec
+├── build.bat
+├── register_context_menu.bat    # Add right-click menu (run as Admin)
+├── unregister_context_menu.bat  # Remove right-click menu (run as Admin)
+├── create_icons.py              # Generates resources/badger.*
+└── resources/
+    ├── badger.ico
+    ├── badger.png
+    └── badger_*.png
 ```
-
-## Supported File Types
-
-The application can print:
-- PDF (.pdf)
-- Word documents (.doc, .docx)
-- Excel spreadsheets (.xls, .xlsx)
-- PowerPoint presentations (.ppt, .pptx)
-- Images (.jpg, .jpeg, .png, .bmp)
-- Text files (.txt)
-- And most other file types Windows can print
-
-## Troubleshooting
-
-### Build fails with missing dependencies
-Run: `build.bat` - it will automatically install any missing packages
-
-### Context menu not appearing
-Make sure to run `register_context_menu.bat` as Administrator
-
-### Application crashes
-Check that PyQt5 is properly installed:
-```bash
-python -c "from PyQt5.QtWidgets import QApplication; print('PyQt5 OK')"
-```
-
-### Printing doesn't work
-- Make sure your printer is connected and set as default (or select it from the app)
-- Try opening the file manually to confirm it prints
-
-## Development
-
-To modify the application:
-
-1. Edit `batch_print_app.py` for application logic
-2. Edit `create_icons.py` to change the badger icon design
-3. Edit `batch_print.spec` for PyInstaller configuration
-4. Run `build.bat` to rebuild
-
-### Icon Customization
-
-To change the badger icon design, edit the `create_badger_icon()` function in `create_icons.py`:
-
-```python
-def create_badger_icon(size=256, output_dir="resources"):
-    # Modify drawing code here
-```
-
-Then regenerate icons with:
-```bash
-python create_icons.py
-```
-
-## License
-
-Free to modify and distribute.
-
-## Notes
-
-- The application uses Windows system print handlers
-- Files are sent to the default printer or selected printer
-- Printer settings may vary depending on printer capability
-- The context menu integration is Windows-specific
 
 ---
 
-**Honey Batchr** - Making batch printing honey-sweet! 🦡
+## Configuration file
+
+`%USERPROFILE%\.honeybatchr\config.json`
+
+```json
+{
+  "copies": 1,
+  "collate": true,
+  "grayscale": false,
+  "print_as_image": false,
+  "bleed_marks": false,
+  "duplex": false,
+  "auto_rotate": true,
+  "auto_center": true,
+  "orientation": "Portrait",
+  "print_what": "Document and markups",
+  "simulate_overprint": false,
+  "pages_per_sheet": 1,
+  "page_order": "Horizontal",
+  "margins": 0.2,
+  "margins_enabled": true,
+  "print_page_border": true,
+  "theme": "Fusion Light"
+}
+```
+
+---
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Dark / purple UI on first run | Settings > Theme > Fusion Light |
+| PDF preview blank in Page Config dialog | `pip install PyMuPDF` |
+| Page count shows "All" instead of range | `pip install pypdf` |
+| Office files print 1-up only | Expected — N-up is not applied to ShellExecute path |
+| Printer not listed | Check Windows Devices & Printers; restart app |
+| Context menu missing | Run `register_context_menu.bat` as Administrator |
+
+---
+
+## TODO
+
+### In progress
+- [ ] Printer orientation: respect Auto-Rotate and Auto-Center settings during composition
+- [ ] Paper size selection (currently hard-coded to US Letter 8.5 x 11)
+
+### Planned
+- [ ] Per-file duplex override (currently only global duplex is applied)
+- [ ] Booklet print mode — fold-order page imposition
+- [ ] Scale mode — fit/fill/percentage scale control
+- [ ] Tile Large Pages mode — split oversized pages across sheets
+- [ ] Print What: Document only vs. Document and markups (PDF annotation handling)
+- [ ] Simulate Overprinting (Fusion blend mode rendering)
+- [ ] Bleed Marks output
+- [ ] Page Setting dialog (paper size, source tray)
+- [ ] Loop printing in list order (continuous/kiosk mode)
+- [ ] Windows right-click context menu auto-registration on first run (without requiring Admin separately)
+- [ ] Progress bar / cancel button during long print jobs
+- [ ] Print preview for the full job before sending
+- [ ] Collate support for the GDI print path (currently honoured only by driver for ShellExecute)
+- [ ] Recent files list
+
+### Known issues
+- [ ] `SetPrinter` raises "Access is denied" — replaced by QPrinter, no longer called
+- [ ] Page Config dialog right panel shifts slightly on first show (layout settles after first render)
