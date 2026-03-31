@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''main.py''\\).read\\(\\)\\); print\\(''syntax OK''\\)\")",
+      "Bash(find /h/Jobdocs/JobDocs -name *.ui -type f)",
+      "Bash(python3 -c \"from PyQt6.QtWidgets import QApplication, QStyleFactory; app = QApplication\\([]\\); print\\(''Available Styles:''\\); print\\(sorted\\(QStyleFactory.keys\\(\\)\\)\\)\")",
+      "Bash(python3:*)",
+      "Bash(pip install:*)"
+    ]
+  }
+}
