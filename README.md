@@ -117,31 +117,7 @@ HoneyBatchr/
 
 `%USERPROFILE%\.honeybatchr\config.json`
 
-```json
-{
-  "copies": 1,
-  "collate": true,
-  "grayscale": false,
-  "print_as_image": false,
-  "bleed_marks": false,
-  "duplex": false,
-  "auto_rotate": true,
-  "auto_center": true,
-  "orientation": "Portrait",
-  "print_what": "Document and markups",
-  "simulate_overprint": false,
-  "pages_per_sheet": 1,
-  "page_order": "Horizontal",
-  "margins": 0.2,
-  "margins_enabled": true,
-  "print_page_border": true,
-  "theme": "Fusion Light"
-}
-```
 
----
-
-## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
