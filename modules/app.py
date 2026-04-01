@@ -2,6 +2,7 @@
 
 import os
 import math
+import sys
 from datetime import datetime
 from typing import List
 
@@ -572,6 +573,9 @@ class BatchPrintApp(QMainWindow):
         QMessageBox.information(self, "Page Setting", "Page setting dialog is not yet implemented.")
 
     def printer_properties(self):
+        if sys.platform != "win32":
+            QMessageBox.information(self, "Properties", "Printer properties are only available on Windows.")
+            return
         try:
             import subprocess
             printer_name = self.printer_combo.currentText()

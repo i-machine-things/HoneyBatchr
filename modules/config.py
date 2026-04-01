@@ -38,8 +38,10 @@ def load_config() -> dict:
 
 def write_config(data: dict) -> None:
     CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+    tmp = CONFIG_FILE.with_suffix(".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
+    tmp.replace(CONFIG_FILE)
 
 
 def update_config_value(key: str, value) -> None:

@@ -43,19 +43,21 @@ class PageConfigDialog(QDialog):
         try:
             import fitz  # type: ignore[import]  # PyMuPDF
             doc = fitz.open(path)
-            self._page_count = len(doc)
-            if self._page_count > 0:
-                r = doc[0].rect
-                self._doc_w_inch = r.width / 72.0
-                self._doc_h_inch = r.height / 72.0
-            for i in range(self._page_count):
-                pix = doc[i].get_pixmap(matrix=fitz.Matrix(72 / 72, 72 / 72), alpha=False)
-                img = QImage(
-                    bytes(pix.samples), pix.width, pix.height,
-                    pix.stride, QImage.Format.Format_RGB888
-                )
-                self._page_images.append(img.copy())
-            doc.close()
+            try:
+                self._page_count = len(doc)
+                if self._page_count > 0:
+                    r = doc[0].rect
+                    self._doc_w_inch = r.width / 72.0
+                    self._doc_h_inch = r.height / 72.0
+                for i in range(self._page_count):
+                    pix = doc[i].get_pixmap(matrix=fitz.Matrix(72 / 72, 72 / 72), alpha=False)
+                    img = QImage(
+                        bytes(pix.samples), pix.width, pix.height,
+                        pix.stride, QImage.Format.Format_RGB888
+                    )
+                    self._page_images.append(img.copy())
+            finally:
+                doc.close()
             return
         except Exception as e:
             print(f"fitz load failed for {path!r}: {e}")
@@ -265,8 +267,10 @@ class PageConfigDialog(QDialog):
         fi.setContentsMargins(60, 0, 0, 0)
         fi.setSpacing(2)
         self._flip_long = QRadioButton("Flip on long edge")
-        self._flip_long.setChecked(True)
+        flip_short_saved = self.entry.get("flip_short_edge", False)
+        self._flip_long.setChecked(not flip_short_saved)
         self._flip_short = QRadioButton("Flip on short edge")
+        self._flip_short.setChecked(flip_short_saved)
         fi.addWidget(self._flip_long)
         fi.addWidget(self._flip_short)
         sg_lay.addWidget(flip_w)
@@ -407,11 +411,18 @@ class PageConfigDialog(QDialog):
     # ── Accept ─────────────────────────────────────────────────────────────────
 
     def _on_ok(self):
+        if self._r_pages.isChecked():
+            page_range = self._pages_edit.text().strip()
+            if not page_range:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.warning(self, "Invalid Range", "Please enter a page range.")
+                return
         self.entry["copies_override"] = self._copies_spin.value()
         self.entry["duplex_override"] = self._duplex_chk.isChecked()
+        self.entry["flip_short_edge"] = self._flip_short.isChecked()
         self.entry["reverse_pages"] = self._reverse_chk.isChecked()
         self.entry["print_range"] = (
-            self._pages_edit.text() if self._r_pages.isChecked() else "All"
+            self._pages_edit.text().strip() if self._r_pages.isChecked() else "All"
         )
         self.entry["page_subset"] = self._subset_combo.currentText()
         self.accept()

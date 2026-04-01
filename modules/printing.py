@@ -69,7 +69,11 @@ def compose_nup_pdf(
 
         indices = indices * max(1, entry.get("copies_override", 1))
 
-        for sheet_start in range(0, max(len(indices), 1), nup):
+        if not indices:
+            src.close()
+            continue
+
+        for sheet_start in range(0, len(indices), nup):
             slot_indices = indices[sheet_start:sheet_start + nup]
             page = out.new_page(width=pw, height=ph)
             for slot, idx in enumerate(slot_indices):
