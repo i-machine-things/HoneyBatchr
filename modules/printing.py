@@ -35,11 +35,14 @@ def compose_nup_pdf(
     """Render all entries into a single N-up PDF and return its temp path."""
     import fitz  # type: ignore[import]
 
-    cols = math.ceil(math.sqrt(nup))
-    rows = math.ceil(nup / cols)
+    cols = max(1, math.ceil(math.sqrt(nup)))
+    rows = max(1, math.ceil(nup / cols))
 
-    # US Letter in points
-    pw, ph = 8.5 * 72, 11.0 * 72
+    # 2-up uses landscape; all others use portrait (US Letter in points)
+    if nup == 2:
+        pw, ph = 11.0 * 72, 8.5 * 72   # landscape
+    else:
+        pw, ph = 8.5 * 72, 11.0 * 72   # portrait
     cell_w = (pw - margin_pts * (cols + 1)) / cols
     cell_h = (ph - margin_pts * (rows + 1)) / rows
 
@@ -90,7 +93,15 @@ def compose_nup_pdf(
     tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
     tmp_path = tmp.name
     tmp.close()
-    out.save(tmp_path)
+    try:
+        out.save(tmp_path)
+    except Exception:
+        out.close()
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
     out.close()
     return tmp_path
 
@@ -160,7 +171,13 @@ def print_pdf_qt(
             img = QImage(
                 bytes(pix.samples), pix.width, pix.height, pix.stride, fmt
             )
-            painter.drawImage(QRect(0, 0, dw, dh), img)
+            # Preserve aspect ratio: centre image on the page
+            scale = min(dw / img.width(), dh / img.height())
+            iw = int(img.width() * scale)
+            ih = int(img.height() * scale)
+            x = (dw - iw) // 2
+            y = (dh - ih) // 2
+            painter.drawImage(QRect(x, y, iw, ih), img)
         doc.close()
     finally:
         painter.end()

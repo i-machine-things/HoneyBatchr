@@ -31,6 +31,8 @@ def parse_page_range(rng: str, total: int) -> list[int]:
 
 def slot_to_grid(slot: int, cols: int, rows: int, order: str) -> tuple[int, int]:
     """Map a sheet slot index to (col, row) for the given page order."""
+    cols = max(1, cols)
+    rows = max(1, rows)
     if order.startswith("Vertical"):
         col_i, row_i = slot // rows, slot % rows
     else:

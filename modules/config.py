@@ -27,13 +27,14 @@ DEFAULT_CONFIG: dict = {
 
 
 def load_config() -> dict:
+    result = dict(DEFAULT_CONFIG)
     try:
         if CONFIG_FILE.exists():
             with open(CONFIG_FILE, encoding="utf-8") as f:
-                return json.load(f)
+                result.update(json.load(f))
     except Exception as e:
         print(f"Error loading config: {e}")
-    return dict(DEFAULT_CONFIG)
+    return result
 
 
 def write_config(data: dict) -> None:

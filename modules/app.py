@@ -279,8 +279,22 @@ class BatchPrintApp(QMainWindow):
 
         # 2 — Multiple Pages Per Sheet
         nup_w = QWidget()
-        gl = QGridLayout(nup_w)
-        gl.setContentsMargins(8, 8, 8, 8)
+        nup_outer = QVBoxLayout(nup_w)
+        nup_outer.setContentsMargins(8, 8, 8, 8)
+        nup_outer.setSpacing(6)
+
+        self.nup_enabled_check = QCheckBox("Enable multiple pages per sheet")
+        self.nup_enabled_check.setChecked(self.config.get("nup_enabled", False))
+        nup_outer.addWidget(self.nup_enabled_check)
+
+        nup_controls = QWidget()
+        nup_controls.setEnabled(self.nup_enabled_check.isChecked())
+        self.nup_enabled_check.toggled.connect(nup_controls.setEnabled)
+        nup_outer.addWidget(nup_controls)
+        nup_outer.addStretch()
+
+        gl = QGridLayout(nup_controls)
+        gl.setContentsMargins(0, 0, 0, 0)
         gl.setHorizontalSpacing(8)
         gl.setVerticalSpacing(6)
 
@@ -354,7 +368,7 @@ class BatchPrintApp(QMainWindow):
         bl.addStretch()
         self.mode_tabs.addTab(booklet_w, "Booklet")
 
-        self.mode_tabs.setCurrentIndex(2)
+        self.mode_tabs.setCurrentIndex(0)
         layout.addWidget(self.mode_tabs)
 
         return group
@@ -705,17 +719,29 @@ class BatchPrintApp(QMainWindow):
             a3.triggered.connect(self.open_containing_folder)
         menu.exec(self.file_table.mapToGlobal(position))
 
+    @staticmethod
+    def _open_path(path: str) -> None:
+        """Open a file or folder with the default application, cross-platform."""
+        import subprocess
+        platform = sys.platform
+        if platform == "win32":
+            os.startfile(path)  # type: ignore[attr-defined]
+        elif platform == "darwin":
+            subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+
     def open_selected_file(self):
         for row in {item.row() for item in self.file_table.selectedItems()}:
             path = self.file_entries[row]["path"]
             if os.path.exists(path):
-                os.startfile(path)
+                self._open_path(path)
 
     def open_containing_folder(self):
         for row in {item.row() for item in self.file_table.selectedItems()}:
-            path = self.file_entries[row]["path"]
-            if os.path.exists(path):
-                os.startfile(os.path.dirname(path))
+            folder = os.path.dirname(self.file_entries[row]["path"])
+            if os.path.exists(folder):
+                self._open_path(folder)
 
     # ── Printing ───────────────────────────────────────────────────────────────
 
@@ -740,7 +766,8 @@ class BatchPrintApp(QMainWindow):
 
         if fitz_entries:
             try:
-                nup = max(1, int(self.pages_per_sheet_combo.currentText()))
+                nup = max(1, int(self.pages_per_sheet_combo.currentText())) \
+                    if self.nup_enabled_check.isChecked() else 1
                 order = self.page_order_combo.currentText()
                 margin_pts = self.margins_spin.value() * 72 if self.margins_check.isChecked() else 0.0
                 draw_border = self.print_page_border_check.isChecked() and nup > 1
@@ -758,16 +785,24 @@ class BatchPrintApp(QMainWindow):
                 errors.append(f"Rendered print failed: {e}")
 
         if other_entries:
-            try:
-                import win32api
-                for entry in other_entries:
-                    if os.path.exists(entry["path"]):
-                        win32api.ShellExecute(
-                            0, "printto", entry["path"],
-                            f'"{printer_name.replace(chr(34), "")}"', ".", 0
-                        )
-            except Exception as e:
-                errors.append(f"ShellExecute print failed: {e}")
+            platform = sys.platform
+            if platform != "win32":
+                errors.append(
+                    f"Cannot print {len(other_entries)} non-PDF file(s): "
+                    "ShellExecute is only available on Windows."
+                )
+            else:
+                try:
+                    import win32api
+                    safe_name = printer_name.replace('"', '')
+                    for entry in other_entries:
+                        if os.path.exists(entry["path"]):
+                            win32api.ShellExecute(
+                                0, "printto", entry["path"],
+                                f'"{safe_name}"', ".", 0
+                            )
+                except Exception as e:
+                    errors.append(f"ShellExecute print failed: {e}")
 
         if errors:
             QMessageBox.warning(self, "Print Errors", "\n".join(errors))
@@ -792,6 +827,7 @@ class BatchPrintApp(QMainWindow):
                 "orientation": self.orientation_combo.currentText(),
                 "print_what": self.print_what_combo.currentText(),
                 "simulate_overprint": self.simulate_overprint_check.isChecked(),
+                "nup_enabled": self.nup_enabled_check.isChecked(),
                 "pages_per_sheet": int(self.pages_per_sheet_combo.currentText()),
                 "page_order": self.page_order_combo.currentText(),
                 "margins": self.margins_spin.value(),

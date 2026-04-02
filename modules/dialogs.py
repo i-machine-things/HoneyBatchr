@@ -395,13 +395,17 @@ class PageConfigDialog(QDialog):
     def _prev_sheet(self):
         if self._sheet_index > 0:
             self._sheet_index -= 1
+            self._slider.blockSignals(True)
             self._slider.setValue(self._sheet_index)
+            self._slider.blockSignals(False)
             self._render_current_sheet()
 
     def _next_sheet(self):
         if self._sheet_index < self._total_sheets() - 1:
             self._sheet_index += 1
+            self._slider.blockSignals(True)
             self._slider.setValue(self._sheet_index)
+            self._slider.blockSignals(False)
             self._render_current_sheet()
 
     def _on_slider(self, value: int):
