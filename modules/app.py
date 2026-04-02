@@ -732,7 +732,7 @@ class BatchPrintApp(QMainWindow):
             else:
                 subprocess.Popen(["xdg-open", path])
         except Exception as e:
-            print(f"Failed to open {path!r}: {e}")
+            QMessageBox.warning(None, "Open Failed", f"Could not open:\n{path}\n\n{e}")
 
     def open_selected_file(self):
         for row in {item.row() for item in self.file_table.selectedItems()}:
