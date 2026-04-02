@@ -315,18 +315,37 @@ class PageConfigDialog(QDialog):
         if cw < 20 or ch < 20:
             return
 
+        # Sheet aspect ratio: 2-up is landscape, all others portrait
+        if self._nup == 2:
+            sheet_w_in, sheet_h_in = 11.0, 8.5
+        else:
+            sheet_w_in, sheet_h_in = 8.5, 11.0
+        aspect = sheet_w_in / sheet_h_in
+
+        # Letterbox the canvas to preserve sheet aspect ratio
+        if cw / ch > aspect:
+            draw_w = int(ch * aspect)
+            draw_h = ch
+        else:
+            draw_w = cw
+            draw_h = int(cw / aspect)
+        off_x = (cw - draw_w) // 2
+        off_y = (ch - draw_h) // 2
+
         sheet = QPixmap(cw, ch)
-        sheet.fill(QColor(255, 255, 255))
+        sheet.fill(QColor(240, 240, 240))
+        page_area = QPixmap(draw_w, draw_h)
+        page_area.fill(QColor(255, 255, 255))
 
         cols = math.ceil(math.sqrt(self._nup))
         rows = math.ceil(self._nup / cols)
-        cell_w = cw // cols
-        cell_h = ch // rows
+        cell_w = draw_w // cols
+        cell_h = draw_h // rows
         first = self._sheet_index * self._nup
         reversed_order = "Reversed" in self._page_order
         vertical_order = self._page_order.startswith("Vertical")
 
-        painter = QPainter(sheet)
+        painter = QPainter(page_area)
         painter.setPen(QColor(190, 190, 190))
 
         for slot in range(self._nup):
@@ -366,15 +385,20 @@ class PageConfigDialog(QDialog):
             painter.drawRect(x, y, cw2, ch2)
 
         painter.end()
+
+        # Composite page_area onto the grey canvas background
+        final_painter = QPainter(sheet)
+        final_painter.drawPixmap(off_x, off_y, page_area)
+        final_painter.end()
+
         self._canvas.setPixmap(sheet)
 
-        # Zoom calculation
-        pw, ph = 8.5, 11.0
+        # Zoom calculation using actual sheet dimensions
         dw, dh = self._doc_w_inch, self._doc_h_inch
         if self._nup == 1:
-            zoom = min(pw / dw, ph / dh) * 100
+            zoom = min(sheet_w_in / dw, sheet_h_in / dh) * 100
         else:
-            zoom = min((pw / cols) / dw, (ph / rows) / dh) * 100
+            zoom = min((sheet_w_in / cols) / dw, (sheet_h_in / rows) / dh) * 100
         self._zoom_lbl.setText(f"{zoom:.2f}%")
 
         total = self._total_sheets()
