@@ -724,12 +724,15 @@ class BatchPrintApp(QMainWindow):
         """Open a file or folder with the default application, cross-platform."""
         import subprocess
         platform = sys.platform
-        if platform == "win32":
-            os.startfile(path)  # type: ignore[attr-defined]
-        elif platform == "darwin":
-            subprocess.Popen(["open", path])
-        else:
-            subprocess.Popen(["xdg-open", path])
+        try:
+            if platform == "win32":
+                os.startfile(path)  # type: ignore[attr-defined]
+            elif platform == "darwin":
+                subprocess.Popen(["open", path])
+            else:
+                subprocess.Popen(["xdg-open", path])
+        except Exception as e:
+            print(f"Failed to open {path!r}: {e}")
 
     def open_selected_file(self):
         for row in {item.row() for item in self.file_table.selectedItems()}:
