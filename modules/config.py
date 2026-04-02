@@ -17,6 +17,7 @@ DEFAULT_CONFIG: dict = {
     "orientation": "Portrait",
     "print_what": "Document and markups",
     "simulate_overprint": False,
+    "handling_tab": 0,
     "pages_per_sheet": 2,
     "page_order": "Horizontal",
     "margins": 0.200,

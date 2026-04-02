@@ -279,22 +279,8 @@ class BatchPrintApp(QMainWindow):
 
         # 2 — Multiple Pages Per Sheet
         nup_w = QWidget()
-        nup_outer = QVBoxLayout(nup_w)
-        nup_outer.setContentsMargins(8, 8, 8, 8)
-        nup_outer.setSpacing(6)
-
-        self.nup_enabled_check = QCheckBox("Enable multiple pages per sheet")
-        self.nup_enabled_check.setChecked(self.config.get("nup_enabled", False))
-        nup_outer.addWidget(self.nup_enabled_check)
-
-        nup_controls = QWidget()
-        nup_controls.setEnabled(self.nup_enabled_check.isChecked())
-        self.nup_enabled_check.toggled.connect(nup_controls.setEnabled)
-        nup_outer.addWidget(nup_controls)
-        nup_outer.addStretch()
-
-        gl = QGridLayout(nup_controls)
-        gl.setContentsMargins(0, 0, 0, 0)
+        gl = QGridLayout(nup_w)
+        gl.setContentsMargins(8, 8, 8, 8)
         gl.setHorizontalSpacing(8)
         gl.setVerticalSpacing(6)
 
@@ -368,7 +354,7 @@ class BatchPrintApp(QMainWindow):
         bl.addStretch()
         self.mode_tabs.addTab(booklet_w, "Booklet")
 
-        self.mode_tabs.setCurrentIndex(0)
+        self.mode_tabs.setCurrentIndex(self.config.get("handling_tab", 0))
         layout.addWidget(self.mode_tabs)
 
         return group
@@ -576,8 +562,9 @@ class BatchPrintApp(QMainWindow):
         else:
             QMessageBox.information(self, "Page Configuration", "Add files to the queue first.")
             return
+        nup_active = self.mode_tabs.currentIndex() == 2
         nup_settings = {
-            "pages_per_sheet": int(self.pages_per_sheet_combo.currentText()),
+            "pages_per_sheet": int(self.pages_per_sheet_combo.currentText()) if nup_active else 1,
             "page_order": self.page_order_combo.currentText(),
             "orientation": self.orientation_combo.currentText(),
         }
@@ -770,7 +757,7 @@ class BatchPrintApp(QMainWindow):
         if fitz_entries:
             try:
                 nup = max(1, int(self.pages_per_sheet_combo.currentText())) \
-                    if self.nup_enabled_check.isChecked() else 1
+                    if self.mode_tabs.currentIndex() == 2 else 1
                 order = self.page_order_combo.currentText()
                 margin_pts = self.margins_spin.value() * 72 if self.margins_check.isChecked() else 0.0
                 draw_border = self.print_page_border_check.isChecked() and nup > 1
@@ -830,7 +817,7 @@ class BatchPrintApp(QMainWindow):
                 "orientation": self.orientation_combo.currentText(),
                 "print_what": self.print_what_combo.currentText(),
                 "simulate_overprint": self.simulate_overprint_check.isChecked(),
-                "nup_enabled": self.nup_enabled_check.isChecked(),
+                "handling_tab": self.mode_tabs.currentIndex(),
                 "pages_per_sheet": int(self.pages_per_sheet_combo.currentText()),
                 "page_order": self.page_order_combo.currentText(),
                 "margins": self.margins_spin.value(),
