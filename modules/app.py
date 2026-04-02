@@ -287,7 +287,7 @@ class BatchPrintApp(QMainWindow):
         gl.addWidget(QLabel("Pages per sheet:"), 0, 0)
         pps_row = QHBoxLayout()
         self.pages_per_sheet_combo = QComboBox()
-        self.pages_per_sheet_combo.addItems(["2", "4", "6", "9", "18"])
+        self.pages_per_sheet_combo.addItems(["2", "4", "6", "9"])
         self.pages_per_sheet_combo.setCurrentText(str(self.config.get("pages_per_sheet", 2)))
         self.pages_per_sheet_combo.setFixedWidth(64)
         self.pages_per_sheet_combo.currentTextChanged.connect(self._update_nup_grid)
