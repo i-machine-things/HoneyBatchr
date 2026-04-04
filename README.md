@@ -1,6 +1,6 @@
 # Honey Batchr
 
-A Windows batch printing application built with PyQt6. Matches the Adobe Acrobat Batch Print layout with N-up composition, per-file page configuration, live PDF preview, and theme switching.
+A batch printing application built with PyQt6. Matches the Adobe Acrobat Batch Print layout with N-up composition, per-file page configuration, live PDF preview, and theme switching. Runs on Windows and Linux.
 
 ---
 
@@ -24,7 +24,7 @@ A Windows batch printing application built with PyQt6. Matches the Adobe Acrobat
 
 ## Requirements
 
-- Windows 10/11
+- Windows 10/11 or Linux (CUPS required for non-PDF file printing on Linux)
 - Python 3.11+
 
 ### Python dependencies
@@ -33,7 +33,7 @@ A Windows batch printing application built with PyQt6. Matches the Adobe Acrobat
 PyQt6>=6.4.0
 PyInstaller>=5.0.0
 Pillow>=9.0.0
-pywin32>=306
+pywin32>=306          # Windows only — installed automatically on Windows
 pypdf>=4.0.0
 PyMuPDF>=1.23.0
 ```
@@ -72,11 +72,11 @@ Produces `dist\HoneyBatchr.exe` via PyInstaller.
 
 ## Print Engine
 
-| File type | Render path |
-|-----------|-------------|
-| PDF, XPS, EPUB, CBZ, SVG | PyMuPDF → N-up compose → QPrinter/QPainter |
-| Images (JPG, PNG, BMP, TIF, GIF) | PyMuPDF → N-up compose → QPrinter/QPainter |
-| Word, Excel, PowerPoint, other | `ShellExecute printto` (best-effort, N-up not applied) |
+| File type | Windows | Linux |
+|-----------|---------|-------|
+| PDF, XPS, EPUB, CBZ, SVG | PyMuPDF → N-up compose → QPrinter/QPainter | same |
+| Images (JPG, PNG, BMP, TIF, GIF) | PyMuPDF → N-up compose → QPrinter/QPainter | same |
+| Word, Excel, PowerPoint, other | `ShellExecute printto` (best-effort, N-up not applied) | `lp` via CUPS (best-effort, N-up not applied) |
 
 N-up layout, page borders, and margins are composed by PyMuPDF before the job reaches the printer. Duplex, color mode, and copy count are set through `QPrinter` — no admin rights or `SetPrinter` call needed.
 

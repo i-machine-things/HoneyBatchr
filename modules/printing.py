@@ -1,6 +1,7 @@
 """Print execution: compose N-up PDFs, drive QPrinter, enumerate printers."""
 
 import os
+import sys
 import math
 import tempfile
 
@@ -11,17 +12,31 @@ from modules.utils import parse_page_range, slot_to_grid
 
 def populate_printers(combo: QComboBox) -> None:
     """Fill *combo* with available printers, selecting the system default."""
-    try:
-        import win32print
-        for p in win32print.EnumPrinters(
-            win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS, None, 2
-        ):
-            combo.addItem(p["pPrinterName"])
-        default = win32print.GetDefaultPrinter()
-        idx = combo.findText(default)
+    if sys.platform == "win32":
+        try:
+            import win32print
+            for p in win32print.EnumPrinters(
+                win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS, None, 2
+            ):
+                combo.addItem(p["pPrinterName"])
+            default = win32print.GetDefaultPrinter()
+            idx = combo.findText(default)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+            return
+        except Exception:
+            pass
+
+    # Cross-platform: use Qt printer enumeration (works on Linux via CUPS, macOS via CUPS)
+    from PyQt6.QtPrintSupport import QPrinterInfo
+    default = QPrinterInfo.defaultPrinter()
+    for p in QPrinterInfo.availablePrinters():
+        combo.addItem(p.printerName())
+    if not default.isNull():
+        idx = combo.findText(default.printerName())
         if idx >= 0:
             combo.setCurrentIndex(idx)
-    except Exception:
+    if combo.count() == 0:
         combo.addItem("Default Printer")
 
 

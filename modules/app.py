@@ -775,13 +775,7 @@ class BatchPrintApp(QMainWindow):
                 errors.append(f"Rendered print failed: {e}")
 
         if other_entries:
-            platform = sys.platform
-            if platform != "win32":
-                errors.append(
-                    f"Cannot print {len(other_entries)} non-PDF file(s): "
-                    "ShellExecute is only available on Windows."
-                )
-            else:
+            if sys.platform == "win32":
                 try:
                     import win32api
                     safe_name = printer_name.replace('"', '')
@@ -793,6 +787,28 @@ class BatchPrintApp(QMainWindow):
                             )
                 except Exception as e:
                     errors.append(f"ShellExecute print failed: {e}")
+            else:
+                import subprocess
+                for entry in other_entries:
+                    path = entry["path"]
+                    if not os.path.exists(path):
+                        continue
+                    try:
+                        subprocess.run(
+                            ["lp", "-d", printer_name, path],
+                            check=True,
+                            capture_output=True,
+                        )
+                    except FileNotFoundError:
+                        errors.append(
+                            "lp command not found. Install CUPS to print non-PDF files on Linux."
+                        )
+                        break
+                    except subprocess.CalledProcessError as e:
+                        errors.append(
+                            f"lp failed for {os.path.basename(path)}: "
+                            f"{e.stderr.decode(errors='replace').strip()}"
+                        )
 
         if errors:
             QMessageBox.warning(self, "Print Errors", "\n".join(errors))
