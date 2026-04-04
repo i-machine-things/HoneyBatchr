@@ -133,25 +133,25 @@ HoneyBatchr/
 ## TODO
 
 ### In progress
-- [ ] Printer orientation: respect Auto-Rotate and Auto-Center settings during composition
-- [ ] Paper size selection (currently hard-coded to US Letter 8.5 x 11)
+- [ ] Printer orientation: respect Auto-Rotate and Auto-Center settings during composition — UI controls exist (`auto_rotate`, `auto_center`), saved to config, not yet applied in print engine
+- [ ] Paper size selection (currently hard-coded to US Letter 8.5 x 11) — Page Setting button is a stub
 
 ### Planned
-- [ ] Per-file duplex override (currently only global duplex is applied)
-- [ ] Booklet print mode — fold-order page imposition
-- [ ] Scale mode — fit/fill/percentage scale control
-- [ ] Tile Large Pages mode — split oversized pages across sheets
-- [ ] Print What: Document only vs. Document and markups (PDF annotation handling)
-- [ ] Simulate Overprinting (Fusion blend mode rendering)
-- [ ] Bleed Marks output
-- [ ] Page Setting dialog (paper size, source tray)
-- [ ] Loop printing in list order (continuous/kiosk mode)
+- [ ] Per-file duplex override — UI collects `duplex_override` per file; print engine applies global duplex setting only
+- [ ] Collate support — checkbox present and saved to config; not passed to the rendered print path (`QPrinter.setCollateCopies` not called); ShellExecute path relies on driver
+- [ ] Booklet print mode — UI tab present (subset: both/front/back); fold-order page imposition not implemented in print engine
+- [ ] Scale mode — UI tab present (None / Fit / Reduce / Custom %); not yet applied in print engine
+- [ ] Tile Large Pages mode — UI tab present (zoom, overlap, cut marks, labels); not yet applied in print engine
+- [ ] Print What: Document vs. Document and markups — combo present and saved; PDF annotation filtering not applied during composition
+- [ ] Simulate Overprinting — checkbox present and saved; Fusion blend mode rendering not applied in print engine
+- [ ] Bleed Marks output — checkbox present and saved; not applied during composition
+- [ ] Advanced printer settings dialog — button present; shows placeholder only
+- [ ] Page Setting dialog (paper size, source tray) — button present; shows placeholder only
+- [ ] Loop printing in list order (continuous/kiosk mode) — checkbox present but disabled
 - [ ] Windows right-click context menu auto-registration on first run (without requiring Admin separately)
 - [ ] Progress bar / cancel button during long print jobs
 - [ ] Print preview for the full job before sending
-- [ ] Collate support for the GDI print path (currently honoured only by driver for ShellExecute)
 - [ ] Recent files list
 
 ### Known issues
-- [ ] `SetPrinter` raises "Access is denied" — replaced by QPrinter, no longer called
 - [ ] Page Config dialog right panel shifts slightly on first show (layout settles after first render)
