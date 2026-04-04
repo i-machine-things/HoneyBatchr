@@ -11,7 +11,7 @@ A Windows batch printing application built with PyQt6. Matches the Adobe Acrobat
 - **N-up printing** — compose 1, 2, 4, 6, 8, 9, or 16 pages per sheet with configurable page order and margins
 - **Duplex printing** — flip on long edge or short edge via QPrinter (no admin rights required)
 - **Grayscale / color** — per-job color mode
-- **Per-file page configuration** — page range (`1,5-9,12`), odd/even subset, per-file copies, duplex override, reverse pages, live PDF preview with N-up sheet navigation
+- **Per-file page configuration** — page range (`1,5-9,12`), odd/even subset, per-file copies, reverse pages, live PDF preview with N-up sheet navigation
 - **PDF page count** — automatically reads page count from PDFs and shows range in the table
 - **Print engine** — PyMuPDF composes the N-up layout; QPrinter/QPainter sends it to the driver (duplex and color applied correctly without `SetPrinter`)
 - **Office/other formats** — Word, Excel, PowerPoint fall back to `ShellExecute printto`
