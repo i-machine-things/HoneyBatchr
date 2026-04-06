@@ -16,7 +16,7 @@ This is how the user explicitly asks you to check in on the project.
 ## Rule 1: Git Is Mandatory
 
 - If the project is not a git repository, run `git init` and create an initial commit before doing anything else.
-- Never work directly on `main`, `master`,`stable` . Always create a feature branch first then merge into `master`.
+- Never work directly on `main`, `master` . Always create a feature branch first then merge into `master`.
 - Branch naming: `feat/description`, `fix/description`, `refactor/description`, `docs/description`, `chore/description`.
 - If you are on `main` when you start, create and switch to a feature branch immediately.
 
@@ -43,7 +43,7 @@ Rules:
 
 ## Rule 3: Semantic Versioning
 
-update git hub releases on minor version changes of `stable`
+update git hub releases on minor version changes of `master`
 
 Tag releases using `vMAJOR.MINOR.PATCH`:
 - **MAJOR** -- breaking changes (removed features, changed APIs, incompatible updates)
