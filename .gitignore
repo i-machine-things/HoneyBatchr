@@ -135,6 +135,5 @@ Thumbs.db
 
 # Project specific
 .honeybatchr/
-.claude/
 config.json
 *.bak
