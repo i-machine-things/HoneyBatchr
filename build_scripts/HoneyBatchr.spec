@@ -1,15 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec file for Honey Batchr - one-dir build (fast startup)
 
+import os
 from PyInstaller.utils.hooks import collect_data_files
 
+root = os.path.abspath(os.path.join(SPECPATH, '..'))
 qt_data = collect_data_files('PyQt6')
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    [os.path.join(root, 'main.py')],
+    pathex=[root],
     binaries=[],
-    datas=qt_data + [('resources', 'resources')],
+    datas=qt_data + [(os.path.join(root, 'resources'), 'resources')],
     hiddenimports=[
         'PyQt6.sip',
         'PyQt6.QtPrintSupport',
@@ -41,7 +43,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['resources/badger.ico'],
+    icon=[os.path.join(root, 'resources', 'badger.ico')],
 )
 
 coll = COLLECT(
