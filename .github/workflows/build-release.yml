@@ -1,0 +1,35 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: python -m PyInstaller build_scripts/HoneyBatchr.spec --clean --noconfirm
+
+      - name: Zip release artifact
+        run: Compress-Archive -Path dist\HoneyBatchr\* -DestinationPath HoneyBatchr-${{ github.ref_name }}-windows.zip
+        shell: pwsh
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: HoneyBatchr-${{ github.ref_name }}-windows.zip
+          generate_release_notes: true
