@@ -8,6 +8,7 @@ Before taking any action on this project — including edits, commits, or file c
 
 1. Read `.claude/CLAUDE.md` and `.claude/S&P.md`.
 2. Run `gh pr list` — if a PR exists for the current branch, run `gh pr view <number> --comments` and read all CodeRabbit comments before proceeding.
+   - If `gh` is unavailable or unauthenticated, check the PR manually in the GitHub web UI and acknowledge any open CodeRabbit findings before proceeding.
 3. Do not make any edits until outstanding CR findings are addressed or acknowledged.
 
 No exceptions.

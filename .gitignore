@@ -137,3 +137,4 @@ Thumbs.db
 .honeybatchr/
 config.json
 *.bak
+.claude/settings.local.json

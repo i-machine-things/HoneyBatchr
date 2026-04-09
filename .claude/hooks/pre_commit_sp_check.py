@@ -17,8 +17,12 @@ def get_staged_diff() -> str:
             ["git", "diff", "--cached"],
             capture_output=True, text=True
         )
+        if result.returncode != 0:
+            print(f"git diff --cached failed: {result.stderr.strip()}", file=sys.stderr)
+            return ""
         return result.stdout
-    except Exception:
+    except (FileNotFoundError, subprocess.SubprocessError) as e:
+        print(f"Failed to run git diff: {e}", file=sys.stderr)
         return ""
 
 
@@ -26,11 +30,12 @@ def main():
     try:
         data = json.load(sys.stdin)
         command = data.get("command", "")
-    except Exception:
-        sys.exit(0)
+    except json.JSONDecodeError as e:
+        print(f"pre_commit_sp_check: failed to parse hook input: {e}", file=sys.stderr)
+        sys.exit(1)
 
-    # Only run on git commit commands
-    if not re.search(r"git\s+commit", command):
+    # Match git commit with optional flags/options (e.g. git -c core.editor=... commit)
+    if not re.search(r"\bgit\b.*\bcommit\b", command):
         sys.exit(0)
 
     diff = get_staged_diff()
