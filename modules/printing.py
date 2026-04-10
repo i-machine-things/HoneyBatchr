@@ -122,8 +122,23 @@ def compose_nup_pdf(
     printable_w = pw - ml - mr
     printable_h = ph - mt - mb
 
-    cell_w = (printable_w - margin_pts * (cols + 1)) / cols
-    cell_h = (printable_h - margin_pts * (rows + 1)) / rows
+    if printable_w <= 0 or printable_h <= 0:
+        raise ValueError(
+            f"Page margins ({page_margin_left + page_margin_right:.3f} in wide, "
+            f"{page_margin_top + page_margin_bottom:.3f} in tall) exceed the "
+            f"{paper_size} paper dimensions."
+        )
+
+    net_w = printable_w - margin_pts * (cols + 1)
+    net_h = printable_h - margin_pts * (rows + 1)
+    if net_w <= 0 or net_h <= 0:
+        raise ValueError(
+            f"Cell gap ({margin_pts / 72:.3f} in) is too large for "
+            f"{cols}\u00d7{rows} cells on {paper_size} paper."
+        )
+
+    cell_w = net_w / cols
+    cell_h = net_h / rows
 
     out = fitz.open()
 
@@ -190,6 +205,7 @@ def compose_nup_pdf(
     return tmp_path
 
 
+
 def print_pdf_qt(
     pdf_path: str,
     printer_name: str,
@@ -197,11 +213,12 @@ def print_pdf_qt(
     grayscale: bool,
     duplex: bool,
     flip_long: bool,
+    paper_size: str = "Letter",
 ) -> None:
     """Print a composed PDF via QPrinter/QPainter."""
     import fitz  # type: ignore[import]
     from PyQt6.QtPrintSupport import QPrinter, QPrinterInfo
-    from PyQt6.QtGui import QImage, QPainter, QPageLayout
+    from PyQt6.QtGui import QImage, QPainter, QPageLayout, QPageSize
     from PyQt6.QtCore import QRect
 
     matches = [p for p in QPrinterInfo.availablePrinters()
@@ -224,6 +241,10 @@ def print_pdf_qt(
         )
     else:
         printer.setDuplex(QPrinter.DuplexMode.DuplexNone)
+
+    # Apply selected paper size to the print driver
+    ps_id = getattr(QPageSize.PageSizeId, paper_size, QPageSize.PageSizeId.Letter)
+    printer.setPageSize(QPageSize(ps_id))
 
     # Match QPrinter orientation to the composed PDF's page dimensions
     try:

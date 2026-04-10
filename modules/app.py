@@ -108,7 +108,7 @@ class PageSettingDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Page Setting")
         self.setModal(True)
-        self.setFixedSize(520, 310)
+        self.setFixedSize(520, 340)
 
         self._cfg = dict(config)
 
@@ -170,9 +170,10 @@ class PageSettingDialog(QDialog):
 
         # ── Right preview ─────────────────────────────────────────────────
         self._preview = _PaperPreview()
-        preview_box = QVBoxLayout()
-        preview_box.addWidget(QLabel("Preview"))
-        preview_box.addWidget(self._preview)
+        preview_group = QGroupBox("Preview")
+        preview_inner = QVBoxLayout(preview_group)
+        preview_inner.setContentsMargins(6, 6, 6, 6)
+        preview_inner.addWidget(self._preview)
 
         # ── Button row ────────────────────────────────────────────────────
         ok_btn = QPushButton("OK")
@@ -191,7 +192,7 @@ class PageSettingDialog(QDialog):
         content = QHBoxLayout()
         content.addLayout(form, 1)
         content.addSpacing(12)
-        content.addLayout(preview_box, 1)
+        content.addWidget(preview_group, 1)
 
         root = QVBoxLayout(self)
         root.addLayout(content)
@@ -980,7 +981,7 @@ class BatchPrintApp(QMainWindow):
 
                 tmp = compose_nup_pdf(
                     fitz_entries, nup, order, margin_pts, draw_border,
-                    orientation=self.orientation_combo.currentText(),
+                    orientation=self.config.get("page_setting_orientation", "Portrait"),
                     auto_rotate=self.auto_rotate_check.isChecked(),
                     auto_center=self.auto_center_check.isChecked(),
                     paper_size=self.config.get("paper_size", "Letter"),
@@ -996,6 +997,7 @@ class BatchPrintApp(QMainWindow):
                     grayscale=self.grayscale_check.isChecked(),
                     duplex=self.duplex_check.isChecked(),
                     flip_long=self.flip_long_radio.isChecked(),
+                    paper_size=self.config.get("paper_size", "Letter"),
                 )
             except Exception as e:
                 errors.append(f"Rendered print failed: {e}")
