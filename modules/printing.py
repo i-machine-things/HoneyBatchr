@@ -40,30 +40,6 @@ def populate_printers(combo: QComboBox) -> None:
         combo.addItem("Default Printer")
 
 
-def _detect_landscape(entries_with_indices: list) -> bool:
-    """Return True if the majority of the *filtered* pages are landscape.
-
-    Args:
-        entries_with_indices: list of (entry, indices) tuples where indices
-            are the already-filtered page indices that will actually be printed.
-    """
-    import fitz  # type: ignore[import]
-    landscape = 0
-    portrait = 0
-    for entry, indices in entries_with_indices:
-        try:
-            src = fitz.open(entry["path"])
-            for i in indices:
-                r = src[i].rect
-                if r.width > r.height:
-                    landscape += 1
-                else:
-                    portrait += 1
-            src.close()
-        except (OSError, RuntimeError):
-            pass
-    return landscape > portrait
-
 
 def compose_nup_pdf(
     entries: list,
@@ -98,19 +74,22 @@ def compose_nup_pdf(
 
     # Determine sheet orientation
     if orientation == "Auto":
-        # Open each file just to get page count for index computation, then detect
-        import fitz as _fitz_probe  # type: ignore[import]
-        entries_with_indices = []
+        # Compute filtered indices and count orientations in a single pass per file
+        landscape = 0
+        portrait = 0
         for entry in entries:
             try:
-                s = _fitz_probe.open(entry["path"])
-                idxs = _filtered_indices(entry, len(s))
+                s = fitz.open(entry["path"])
+                for i in _filtered_indices(entry, len(s)):
+                    r = s[i].rect
+                    if r.width > r.height:
+                        landscape += 1
+                    else:
+                        portrait += 1
                 s.close()
-                if idxs:
-                    entries_with_indices.append((entry, idxs))
             except (OSError, RuntimeError):
                 pass
-        use_landscape = _detect_landscape(entries_with_indices)
+        use_landscape = landscape > portrait
     else:
         use_landscape = (orientation == "Landscape")
 
