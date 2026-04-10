@@ -762,7 +762,12 @@ class BatchPrintApp(QMainWindow):
                 margin_pts = self.margins_spin.value() * 72 if self.margins_check.isChecked() else 0.0
                 draw_border = self.print_page_border_check.isChecked() and nup > 1
 
-                tmp = compose_nup_pdf(fitz_entries, nup, order, margin_pts, draw_border)
+                tmp = compose_nup_pdf(
+                    fitz_entries, nup, order, margin_pts, draw_border,
+                    orientation=self.orientation_combo.currentText(),
+                    auto_rotate=self.auto_rotate_check.isChecked(),
+                    auto_center=self.auto_center_check.isChecked(),
+                )
                 print_pdf_qt(
                     tmp,
                     printer_name,

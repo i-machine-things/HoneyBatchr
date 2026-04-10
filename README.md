@@ -10,6 +10,7 @@ A batch printing application built with PyQt6. Matches the Adobe Acrobat Batch P
 - **Drag & drop** — drop files directly onto the file table
 - **N-up printing** — compose 1, 2, 4, 6, 8, 9, or 16 pages per sheet with configurable page order and margins
 - **Duplex printing** — flip on long edge or short edge via QPrinter (no admin rights required)
+- **Orientation** — Portrait, Landscape, or Auto (detects majority orientation of pages to be printed); Auto-Rotate fits each page to its N-up cell; Auto-Center preserves aspect ratio with whitespace padding
 - **Grayscale / color** — per-job color mode
 - **Per-file page configuration** — page range (`1,5-9,12`), odd/even subset, per-file copies, reverse pages, live PDF preview with N-up sheet navigation
 - **PDF page count** — automatically reads page count from PDFs and shows range in the table
@@ -133,7 +134,6 @@ HoneyBatchr/
 ## TODO
 
 ### In progress
-- [ ] Printer orientation: respect Auto-Rotate and Auto-Center settings during composition — UI controls exist (`auto_rotate`, `auto_center`), saved to config, not yet applied in print engine
 - [ ] Paper size selection (currently hard-coded to US Letter 8.5 x 11) — Page Setting button is a stub
 
 ### Planned
