@@ -11,6 +11,7 @@ A batch printing application built with PyQt6. Matches the Adobe Acrobat Batch P
 - **N-up printing** — compose 1, 2, 4, 6, 8, 9, or 16 pages per sheet with configurable page order and margins
 - **Duplex printing** — flip on long edge or short edge via QPrinter (no admin rights required)
 - **Orientation** — Portrait, Landscape, or Auto (detects majority orientation of pages to be printed); Auto-Rotate fits each page to its N-up cell; Auto-Center preserves aspect ratio with whitespace padding
+- **Paper size** — Letter, Legal, Tabloid, A3, A4, A5; configurable per-side page margins (inch) via Page Setting dialog with live preview
 - **Grayscale / color** — per-job color mode
 - **Per-file page configuration** — page range (`1,5-9,12`), odd/even subset, per-file copies, reverse pages, live PDF preview with N-up sheet navigation
 - **PDF page count** — automatically reads page count from PDFs and shows range in the table
@@ -133,9 +134,6 @@ HoneyBatchr/
 
 ## TODO
 
-### In progress
-- [ ] Paper size selection (currently hard-coded to US Letter 8.5 x 11) — Page Setting button is a stub
-
 ### Planned
 - [ ] Per-file duplex override — UI collects `duplex_override` per file; print engine applies global duplex setting only
 - [ ] Collate support — checkbox present and saved to config; not passed to the rendered print path (`QPrinter.setCollateCopies` not called); ShellExecute path relies on driver
@@ -154,4 +152,4 @@ HoneyBatchr/
 - [ ] Recent files list
 
 ### Known issues
-- [ ] Page Config dialog right panel shifts slightly on first show (layout settles after first render)
+- [x] Page Config dialog right panel shifts slightly on first show (layout settles after first render)
