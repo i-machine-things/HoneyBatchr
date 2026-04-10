@@ -40,12 +40,35 @@ def populate_printers(combo: QComboBox) -> None:
         combo.addItem("Default Printer")
 
 
+def _detect_landscape(entries: list) -> bool:
+    """Return True if the majority of source pages are landscape."""
+    import fitz  # type: ignore[import]
+    landscape = 0
+    portrait = 0
+    for entry in entries:
+        try:
+            src = fitz.open(entry["path"])
+            for i in range(len(src)):
+                r = src[i].rect
+                if r.width > r.height:
+                    landscape += 1
+                else:
+                    portrait += 1
+            src.close()
+        except (OSError, RuntimeError):
+            pass
+    return landscape > portrait
+
+
 def compose_nup_pdf(
     entries: list,
     nup: int,
     order: str,
     margin_pts: float,
     draw_border: bool,
+    orientation: str = "Portrait",
+    auto_rotate: bool = True,
+    auto_center: bool = True,
 ) -> str:
     """Render all entries into a single N-up PDF and return its temp path."""
     import fitz  # type: ignore[import]
@@ -53,11 +76,17 @@ def compose_nup_pdf(
     cols = max(1, math.ceil(math.sqrt(nup)))
     rows = max(1, math.ceil(nup / cols))
 
-    # 2-up uses landscape; all others use portrait (US Letter in points)
-    if nup == 2:
-        pw, ph = 11.0 * 72, 8.5 * 72   # landscape
+    # Determine sheet orientation
+    if orientation == "Auto":
+        use_landscape = _detect_landscape(entries)
     else:
-        pw, ph = 8.5 * 72, 11.0 * 72   # portrait
+        use_landscape = (orientation == "Landscape")
+
+    if use_landscape:
+        pw, ph = 11.0 * 72, 8.5 * 72
+    else:
+        pw, ph = 8.5 * 72, 11.0 * 72
+
     cell_w = (pw - margin_pts * (cols + 1)) / cols
     cell_h = (ph - margin_pts * (rows + 1)) / rows
 
@@ -66,7 +95,7 @@ def compose_nup_pdf(
     for entry in entries:
         try:
             src = fitz.open(entry["path"])
-        except Exception:
+        except (OSError, RuntimeError):
             continue
 
         n = len(src)
@@ -98,10 +127,38 @@ def compose_nup_pdf(
                 col_i, row_i = slot_to_grid(slot, cols, rows, order)
                 x0 = margin_pts + col_i * (cell_w + margin_pts)
                 y0 = margin_pts + row_i * (cell_h + margin_pts)
-                rect = fitz.Rect(x0, y0, x0 + cell_w, y0 + cell_h)
-                page.show_pdf_page(rect, src, idx)
+
+                src_rect = src[idx].rect
+                src_w, src_h = src_rect.width, src_rect.height
+
+                # Auto-rotate: if page and cell have mismatched orientations, rotate 90°
+                rotate = 0
+                if auto_rotate and src_w > 0 and src_h > 0:
+                    page_is_landscape = src_w > src_h
+                    cell_is_landscape = cell_w > cell_h
+                    if page_is_landscape != cell_is_landscape:
+                        rotate = 90
+                        src_w, src_h = src_h, src_w  # swap dims for fit calculation
+
+                # Auto-center: scale to fit cell preserving aspect ratio, centre the result
+                if auto_center and src_w > 0 and src_h > 0:
+                    scale = min(cell_w / src_w, cell_h / src_h)
+                    fit_w = src_w * scale
+                    fit_h = src_h * scale
+                    cx = x0 + (cell_w - fit_w) / 2
+                    cy = y0 + (cell_h - fit_h) / 2
+                    dest = fitz.Rect(cx, cy, cx + fit_w, cy + fit_h)
+                else:
+                    dest = fitz.Rect(x0, y0, x0 + cell_w, y0 + cell_h)
+
+                page.show_pdf_page(dest, src, idx, rotate=rotate)
+
                 if draw_border:
-                    page.draw_rect(rect, color=(0.7, 0.7, 0.7), width=0.5)
+                    page.draw_rect(
+                        fitz.Rect(x0, y0, x0 + cell_w, y0 + cell_h),
+                        color=(0.7, 0.7, 0.7),
+                        width=0.5,
+                    )
 
         src.close()
 
@@ -132,7 +189,7 @@ def print_pdf_qt(
     """Print a composed PDF via QPrinter/QPainter."""
     import fitz  # type: ignore[import]
     from PyQt6.QtPrintSupport import QPrinter, QPrinterInfo
-    from PyQt6.QtGui import QImage, QPainter
+    from PyQt6.QtGui import QImage, QPainter, QPageLayout
     from PyQt6.QtCore import QRect
 
     matches = [p for p in QPrinterInfo.availablePrinters()
@@ -155,6 +212,19 @@ def print_pdf_qt(
         )
     else:
         printer.setDuplex(QPrinter.DuplexMode.DuplexNone)
+
+    # Match QPrinter orientation to the composed PDF's page dimensions
+    try:
+        probe = fitz.open(pdf_path)
+        if len(probe) > 0:
+            r = probe[0].rect
+            if r.width > r.height:
+                printer.setPageOrientation(QPageLayout.Orientation.Landscape)
+            else:
+                printer.setPageOrientation(QPageLayout.Orientation.Portrait)
+        probe.close()
+    except (OSError, RuntimeError):
+        pass
 
     painter = QPainter()
     if not painter.begin(printer):
