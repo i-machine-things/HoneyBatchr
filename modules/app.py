@@ -12,17 +12,230 @@ from PyQt6.QtWidgets import (
     QSpinBox, QDoubleSpinBox, QComboBox, QCheckBox, QMessageBox, QMenu, QFrame,
     QStatusBar, QMenuBar, QButtonGroup, QAbstractItemView, QSizePolicy,
     QRadioButton, QGroupBox, QTabWidget, QHeaderView, QStyleFactory,
-    QApplication,
+    QApplication, QDialog,
 )
-from PyQt6.QtCore import Qt, QItemSelectionModel
-from PyQt6.QtGui import QIcon, QAction, QActionGroup
+from PyQt6.QtCore import Qt, QItemSelectionModel, QRectF
+from PyQt6.QtGui import QIcon, QAction, QActionGroup, QPainter, QPen, QColor, QFont
 
 from modules.config import CONFIG_FILE, load_config, write_config, update_config_value
 from modules.utils import FITZ_EXTS, pdf_page_count
 from modules.themes import light_palette, dark_palette, STYLESHEET
 from modules.widgets import DroppableTable
 from modules.dialogs import PageConfigDialog
-from modules.printing import populate_printers, compose_nup_pdf, print_pdf_qt
+from modules.printing import populate_printers, compose_nup_pdf, print_pdf_qt, PAPER_SIZES
+
+
+class _PaperPreview(QWidget):
+    """Live paper preview widget — draws the sheet with dimension labels."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumSize(160, 180)
+        self._w_in = 8.5
+        self._h_in = 11.0
+
+    def set_size(self, w_in: float, h_in: float):
+        self._w_in = w_in
+        self._h_in = h_in
+        self.update()
+
+    def paintEvent(self, a0):  # noqa: ARG002
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        cw, ch = self.width(), self.height()
+        padding = 28
+        avail_w = cw - padding * 2
+        avail_h = ch - padding * 2
+
+        scale = min(avail_w / self._w_in, avail_h / self._h_in)
+        rw = self._w_in * scale
+        rh = self._h_in * scale
+        rx = (cw - rw) / 2
+        ry = (ch - rh) / 2
+
+        # Shadow
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(180, 180, 180))
+        p.drawRect(QRectF(rx + 3, ry + 3, rw, rh))
+
+        # Page
+        p.setBrush(QColor(255, 255, 255))
+        p.setPen(QPen(QColor(100, 100, 100), 1))
+        p.drawRect(QRectF(rx, ry, rw, rh))
+
+        # Dimension labels
+        font = QFont()
+        font.setPointSize(8)
+        p.setFont(font)
+        p.setPen(QColor(60, 60, 60))
+
+        w_label = f"{self._w_in:.3f} inch"
+        h_label = f"{self._h_in:.3f} inch"
+
+        # Width label — centred above
+        p.drawText(
+            QRectF(rx, ry - 18, rw, 16),
+            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+            w_label,
+        )
+        # Arrows for width
+        p.drawLine(int(rx), int(ry - 10), int(rx + rw), int(ry - 10))
+        p.drawLine(int(rx), int(ry - 14), int(rx), int(ry - 6))
+        p.drawLine(int(rx + rw), int(ry - 14), int(rx + rw), int(ry - 6))
+
+        # Height label — rotated on left side
+        p.save()
+        p.translate(rx - 10, ry + rh / 2)
+        p.rotate(-90)
+        p.drawText(
+            QRectF(-rh / 2, -16, rh, 16),
+            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+            h_label,
+        )
+        p.restore()
+        p.drawLine(int(rx - 4), int(ry), int(rx - 4), int(ry + rh))
+        p.drawLine(int(rx - 8), int(ry), int(rx), int(ry))
+        p.drawLine(int(rx - 8), int(ry + rh), int(rx), int(ry + rh))
+
+        p.end()
+
+
+class PageSettingDialog(QDialog):
+    """Page Setting dialog: paper size, orientation, and page margins with live preview."""
+
+    def __init__(self, config: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Page Setting")
+        self.setModal(True)
+        self.setFixedSize(520, 310)
+
+        self._cfg = dict(config)
+
+        # ── Left form ────────────────────────────────────────────────────
+        form = QGridLayout()
+        form.setVerticalSpacing(10)
+        form.setHorizontalSpacing(8)
+
+        # Orientation
+        form.addWidget(QLabel("Orientation:"), 0, 0, Qt.AlignmentFlag.AlignRight)
+        orient_row = QHBoxLayout()
+        self._portrait_radio = QRadioButton("Portrait")
+        self._landscape_radio = QRadioButton("Landscape")
+        orient_group = QButtonGroup(self)
+        orient_group.addButton(self._portrait_radio)
+        orient_group.addButton(self._landscape_radio)
+        orient_row.addWidget(self._portrait_radio)
+        orient_row.addWidget(self._landscape_radio)
+        orient_row.addStretch()
+        form.addLayout(orient_row, 0, 1, 1, 3)
+
+        # Paper size
+        form.addWidget(QLabel("Page Size:"), 1, 0, Qt.AlignmentFlag.AlignRight)
+        self._size_combo = QComboBox()
+        self._size_combo.addItems(list(PAPER_SIZES.keys()))
+        form.addWidget(self._size_combo, 1, 1, 1, 3)
+
+        # Margins
+        form.addWidget(QLabel("Page Margins:"), 2, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+
+        def _margin_spin():
+            s = QDoubleSpinBox()
+            s.setRange(0.0, 4.0)
+            s.setDecimals(2)
+            s.setSingleStep(0.01)
+            s.setFixedWidth(62)
+            return s
+
+        self._ml = _margin_spin()
+        self._mr = _margin_spin()
+        self._mt = _margin_spin()
+        self._mb = _margin_spin()
+
+        mg = QGridLayout()
+        mg.setSpacing(4)
+        mg.addWidget(QLabel("Left"),   0, 0, Qt.AlignmentFlag.AlignRight)
+        mg.addWidget(self._ml,         0, 1)
+        mg.addWidget(QLabel("inch"),   0, 2)
+        mg.addWidget(QLabel("Right"),  1, 0, Qt.AlignmentFlag.AlignRight)
+        mg.addWidget(self._mr,         1, 1)
+        mg.addWidget(QLabel("inch"),   1, 2)
+        mg.addWidget(QLabel("Top"),    2, 0, Qt.AlignmentFlag.AlignRight)
+        mg.addWidget(self._mt,         2, 1)
+        mg.addWidget(QLabel("inch"),   2, 2)
+        mg.addWidget(QLabel("Bottom"), 3, 0, Qt.AlignmentFlag.AlignRight)
+        mg.addWidget(self._mb,         3, 1)
+        mg.addWidget(QLabel("inch"),   3, 2)
+        form.addLayout(mg, 2, 1, 1, 3)
+
+        # ── Right preview ─────────────────────────────────────────────────
+        self._preview = _PaperPreview()
+        preview_box = QVBoxLayout()
+        preview_box.addWidget(QLabel("Preview"))
+        preview_box.addWidget(self._preview)
+
+        # ── Button row ────────────────────────────────────────────────────
+        ok_btn = QPushButton("OK")
+        ok_btn.setFixedWidth(80)
+        ok_btn.setDefault(True)
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setFixedWidth(80)
+        cancel_btn.clicked.connect(self.reject)
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        btn_row.addWidget(ok_btn)
+        btn_row.addWidget(cancel_btn)
+
+        # ── Root layout ───────────────────────────────────────────────────
+        content = QHBoxLayout()
+        content.addLayout(form, 1)
+        content.addSpacing(12)
+        content.addLayout(preview_box, 1)
+
+        root = QVBoxLayout(self)
+        root.addLayout(content)
+        root.addLayout(btn_row)
+
+        # ── Populate from config ──────────────────────────────────────────
+        orientation = self._cfg.get("page_setting_orientation", "Portrait")
+        if orientation == "Landscape":
+            self._landscape_radio.setChecked(True)
+        else:
+            self._portrait_radio.setChecked(True)
+
+        size = self._cfg.get("paper_size", "Letter")
+        idx = self._size_combo.findText(size)
+        self._size_combo.setCurrentIndex(idx if idx >= 0 else 0)
+
+        self._ml.setValue(self._cfg.get("page_margin_left",   0.02))
+        self._mr.setValue(self._cfg.get("page_margin_right",  0.02))
+        self._mt.setValue(self._cfg.get("page_margin_top",    0.02))
+        self._mb.setValue(self._cfg.get("page_margin_bottom", 0.02))
+
+        # Connect signals → live preview
+        self._portrait_radio.toggled.connect(self._refresh_preview)
+        self._landscape_radio.toggled.connect(self._refresh_preview)
+        self._size_combo.currentTextChanged.connect(self._refresh_preview)
+        self._refresh_preview()
+
+    def _refresh_preview(self):
+        name = self._size_combo.currentText()
+        w, h = PAPER_SIZES.get(name, (8.5, 11.0))
+        if self._landscape_radio.isChecked():
+            w, h = h, w
+        self._preview.set_size(w, h)
+
+    def values(self) -> dict:
+        """Return the selected settings as a dict."""
+        return {
+            "paper_size": self._size_combo.currentText(),
+            "page_setting_orientation": "Landscape" if self._landscape_radio.isChecked() else "Portrait",
+            "page_margin_left":   self._ml.value(),
+            "page_margin_right":  self._mr.value(),
+            "page_margin_top":    self._mt.value(),
+            "page_margin_bottom": self._mb.value(),
+        }
 
 
 class BatchPrintApp(QMainWindow):
@@ -571,7 +784,10 @@ class BatchPrintApp(QMainWindow):
         PageConfigDialog(entry, nup_settings, self).exec()
 
     def page_setting(self):
-        QMessageBox.information(self, "Page Setting", "Page setting dialog is not yet implemented.")
+        dlg = PageSettingDialog(self.config, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.config.update(dlg.values())
+            self.save_config(silent=True)
 
     def printer_properties(self):
         if sys.platform != "win32":
@@ -767,6 +983,11 @@ class BatchPrintApp(QMainWindow):
                     orientation=self.orientation_combo.currentText(),
                     auto_rotate=self.auto_rotate_check.isChecked(),
                     auto_center=self.auto_center_check.isChecked(),
+                    paper_size=self.config.get("paper_size", "Letter"),
+                    page_margin_left=self.config.get("page_margin_left", 0.02),
+                    page_margin_right=self.config.get("page_margin_right", 0.02),
+                    page_margin_top=self.config.get("page_margin_top", 0.02),
+                    page_margin_bottom=self.config.get("page_margin_bottom", 0.02),
                 )
                 print_pdf_qt(
                     tmp,
@@ -844,6 +1065,12 @@ class BatchPrintApp(QMainWindow):
                 "margins": self.margins_spin.value(),
                 "margins_enabled": self.margins_check.isChecked(),
                 "print_page_border": self.print_page_border_check.isChecked(),
+                "paper_size": self.config.get("paper_size", "Letter"),
+                "page_setting_orientation": self.config.get("page_setting_orientation", "Portrait"),
+                "page_margin_left":   self.config.get("page_margin_left",   0.02),
+                "page_margin_right":  self.config.get("page_margin_right",  0.02),
+                "page_margin_top":    self.config.get("page_margin_top",    0.02),
+                "page_margin_bottom": self.config.get("page_margin_bottom", 0.02),
                 "theme": self.config.get("theme", "Fusion Light"),
             }
             write_config(data)

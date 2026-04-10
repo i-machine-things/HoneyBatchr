@@ -23,6 +23,12 @@ DEFAULT_CONFIG: dict = {
     "margins": 0.200,
     "margins_enabled": True,
     "print_page_border": True,
+    "paper_size": "Letter",
+    "page_setting_orientation": "Portrait",
+    "page_margin_left": 0.02,
+    "page_margin_right": 0.02,
+    "page_margin_top": 0.02,
+    "page_margin_bottom": 0.02,
     "theme": "Fusion Light",
 }
 
