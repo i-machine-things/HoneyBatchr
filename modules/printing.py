@@ -40,15 +40,20 @@ def populate_printers(combo: QComboBox) -> None:
         combo.addItem("Default Printer")
 
 
-def _detect_landscape(entries: list) -> bool:
-    """Return True if the majority of source pages are landscape."""
+def _detect_landscape(entries_with_indices: list) -> bool:
+    """Return True if the majority of the *filtered* pages are landscape.
+
+    Args:
+        entries_with_indices: list of (entry, indices) tuples where indices
+            are the already-filtered page indices that will actually be printed.
+    """
     import fitz  # type: ignore[import]
     landscape = 0
     portrait = 0
-    for entry in entries:
+    for entry, indices in entries_with_indices:
         try:
             src = fitz.open(entry["path"])
-            for i in range(len(src)):
+            for i in indices:
                 r = src[i].rect
                 if r.width > r.height:
                     landscape += 1
@@ -76,9 +81,36 @@ def compose_nup_pdf(
     cols = max(1, math.ceil(math.sqrt(nup)))
     rows = max(1, math.ceil(nup / cols))
 
+    # Pre-compute filtered indices for every entry (needed for Auto detection and rendering)
+    def _filtered_indices(entry: dict, page_count: int) -> list:
+        idx = list(range(page_count))
+        rng = entry.get("print_range", "All")
+        if rng and rng != "All":
+            idx = parse_page_range(rng, page_count)
+        subset = entry.get("page_subset", "All pages in range")
+        if subset == "Odd pages only":
+            idx = [i for i in idx if i % 2 == 0]
+        elif subset == "Even pages only":
+            idx = [i for i in idx if i % 2 == 1]
+        if entry.get("reverse_pages", False):
+            idx.reverse()
+        return idx * max(1, entry.get("copies_override", 1))
+
     # Determine sheet orientation
     if orientation == "Auto":
-        use_landscape = _detect_landscape(entries)
+        # Open each file just to get page count for index computation, then detect
+        import fitz as _fitz_probe  # type: ignore[import]
+        entries_with_indices = []
+        for entry in entries:
+            try:
+                s = _fitz_probe.open(entry["path"])
+                idxs = _filtered_indices(entry, len(s))
+                s.close()
+                if idxs:
+                    entries_with_indices.append((entry, idxs))
+            except (OSError, RuntimeError):
+                pass
+        use_landscape = _detect_landscape(entries_with_indices)
     else:
         use_landscape = (orientation == "Landscape")
 
@@ -98,23 +130,7 @@ def compose_nup_pdf(
         except (OSError, RuntimeError):
             continue
 
-        n = len(src)
-        indices = list(range(n))
-
-        rng = entry.get("print_range", "All")
-        if rng and rng != "All":
-            indices = parse_page_range(rng, n)
-
-        subset = entry.get("page_subset", "All pages in range")
-        if subset == "Odd pages only":
-            indices = [i for i in indices if i % 2 == 0]
-        elif subset == "Even pages only":
-            indices = [i for i in indices if i % 2 == 1]
-
-        if entry.get("reverse_pages", False):
-            indices.reverse()
-
-        indices = indices * max(1, entry.get("copies_override", 1))
+        indices = _filtered_indices(entry, len(src))
 
         if not indices:
             src.close()
@@ -127,31 +143,24 @@ def compose_nup_pdf(
                 col_i, row_i = slot_to_grid(slot, cols, rows, order)
                 x0 = margin_pts + col_i * (cell_w + margin_pts)
                 y0 = margin_pts + row_i * (cell_h + margin_pts)
-
-                src_rect = src[idx].rect
-                src_w, src_h = src_rect.width, src_rect.height
+                cell_rect = fitz.Rect(x0, y0, x0 + cell_w, y0 + cell_h)
 
                 # Auto-rotate: if page and cell have mismatched orientations, rotate 90°
                 rotate = 0
-                if auto_rotate and src_w > 0 and src_h > 0:
-                    page_is_landscape = src_w > src_h
+                if auto_rotate:
+                    src_rect = src[idx].rect
+                    page_is_landscape = src_rect.width > src_rect.height
                     cell_is_landscape = cell_w > cell_h
                     if page_is_landscape != cell_is_landscape:
                         rotate = 90
-                        src_w, src_h = src_h, src_w  # swap dims for fit calculation
 
-                # Auto-center: scale to fit cell preserving aspect ratio, centre the result
-                if auto_center and src_w > 0 and src_h > 0:
-                    scale = min(cell_w / src_w, cell_h / src_h)
-                    fit_w = src_w * scale
-                    fit_h = src_h * scale
-                    cx = x0 + (cell_w - fit_w) / 2
-                    cy = y0 + (cell_h - fit_h) / 2
-                    dest = fitz.Rect(cx, cy, cx + fit_w, cy + fit_h)
-                else:
-                    dest = fitz.Rect(x0, y0, x0 + cell_w, y0 + cell_h)
-
-                page.show_pdf_page(dest, src, idx, rotate=rotate)
+                # keep_proportion=auto_center: True centres with whitespace padding;
+                # False stretches to fill the full cell rect
+                page.show_pdf_page(
+                    cell_rect, src, idx,
+                    rotate=rotate,
+                    keep_proportion=auto_center,
+                )
 
                 if draw_border:
                     page.draw_rect(

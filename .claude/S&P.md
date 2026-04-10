@@ -27,3 +27,20 @@ Review this file before making changes to the codebase.
 4. **PyInstaller spec file gitignored — CI workflow broken**
    - `build/batch_print.spec` is inside the gitignored `build/` directory; workflow would fail
    - Fix: copy spec to `build_scripts/HoneyBatchr.spec` (tracked); update workflow to reference `build_scripts/HoneyBatchr.spec`
+
+---
+
+## 2026-04-10 — `modules/printing.py` (PR #4 — feat/printer-orientation)
+
+**Review:** CodeRabbit review of orientation/auto-rotate/auto-center implementation — 2 actionable findings.
+**Result:** Both fixed in `feat/printer-orientation`.
+
+### Findings
+
+1. **`_detect_landscape` counted all pages, ignoring print filters**
+   - Scanned every page in every file; would mis-detect orientation when `print_range`, odd/even, or reverse filters meant only a subset would print
+   - Fix: compute filtered indices (`_filtered_indices` helper) before calling `_detect_landscape`; pass `(entry, indices)` tuples so only pages that will actually print are counted
+
+2. **Manual aspect-ratio scaling duplicated PyMuPDF's `keep_proportion`**
+   - Manual `scale = min(cell_w/src_w, cell_h/src_h)` logic recomputed what `show_pdf_page(keep_proportion=True)` already does natively
+   - Fix: pass `keep_proportion=auto_center` directly to `show_pdf_page` and use the full `cell_rect` in both cases; remove manual scaling
