@@ -223,12 +223,34 @@ class PageSettingDialog(QDialog):
         self._size_combo.currentTextChanged.connect(self._refresh_preview)
         self._refresh_preview()
 
-    def _refresh_preview(self):
+    def _selected_sheet_size(self) -> tuple:
         name = self._size_combo.currentText()
         w, h = PAPER_SIZES.get(name, (8.5, 11.0))
         if self._landscape_radio.isChecked():
             w, h = h, w
+        return w, h
+
+    def _refresh_preview(self):
+        w, h = self._selected_sheet_size()
         self._preview.set_size(w, h)
+
+    def accept(self):
+        w, h = self._selected_sheet_size()
+        if self._ml.value() + self._mr.value() >= w:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self, "Invalid margins",
+                "Combined left + right margins must be smaller than the page width.",
+            )
+            return
+        if self._mt.value() + self._mb.value() >= h:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self, "Invalid margins",
+                "Combined top + bottom margins must be smaller than the page height.",
+            )
+            return
+        super().accept()
 
     def values(self) -> dict:
         """Return the selected settings as a dict."""
