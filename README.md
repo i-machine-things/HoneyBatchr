@@ -73,8 +73,13 @@ Produces `dist\HoneyBatchr.exe` via PyInstaller.
 **Linux:**
 ```bash
 python -m PyInstaller build_scripts/HoneyBatchr.spec --clean --noconfirm
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+flatpak-builder --user --install --force-clean flatpak-build build_scripts/com.honeybatchr.HoneyBatchr.yml
+flatpak build-bundle ~/.local/share/flatpak/repo HoneyBatchr-linux.flatpak com.honeybatchr.HoneyBatchr \
+  --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
 ```
-Produces `dist/HoneyBatchr/HoneyBatchr` (one-dir bundle).
+Produces a `.flatpak` bundle (Flatpak wrapping the PyInstaller one-dir build).
 
 CI builds both platforms on every version tag and attaches both artifacts to the GitHub release.
 
@@ -160,5 +165,4 @@ HoneyBatchr/
 - [ ] Print preview for the full job before sending
 - [ ] Recent files list
 
-### Known issues
-- [x] Page Config dialog right panel shifts slightly on first show (layout settles after first render)
+

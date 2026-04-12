@@ -56,7 +56,8 @@ jobs:
           sudo apt-get install -y \
             libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 \
-            libxkbcommon-x11-0
+            libxkbcommon-x11-0 \
+            flatpak flatpak-builder
 
       - name: Install Python dependencies
         run: pip install -r requirements.txt
@@ -64,11 +65,27 @@ jobs:
       - name: Build with PyInstaller
         run: python -m PyInstaller build_scripts/HoneyBatchr.spec --clean --noconfirm
 
-      - name: Package release artifact
-        run: tar -czf HoneyBatchr-${{ github.ref_name }}-linux.tar.gz -C dist HoneyBatchr
+      - name: Add Flathub remote
+        run: flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Install Flatpak runtime and SDK
+        run: flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+
+      - name: Build Flatpak
+        run: |
+          flatpak-builder --user --install --force-clean \
+            flatpak-build build_scripts/com.honeybatchr.HoneyBatchr.yml
+
+      - name: Bundle Flatpak
+        run: |
+          flatpak build-bundle \
+            ~/.local/share/flatpak/repo \
+            HoneyBatchr-${{ github.ref_name }}-linux.flatpak \
+            com.honeybatchr.HoneyBatchr \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: HoneyBatchr-${{ github.ref_name }}-linux.tar.gz
+          files: HoneyBatchr-${{ github.ref_name }}-linux.flatpak
           generate_release_notes: false
