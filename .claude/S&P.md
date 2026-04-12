@@ -98,3 +98,11 @@ Review this file before making changes to the codebase.
 6. **`tmp` never unlinked in non-manual print path**
    - The hardware-duplex `else` branch printed `tmp` but never deleted it, leaking one temp PDF per print run
    - Fix: wrap `print_pdf_qt` in `try/finally`; unlink `tmp` unconditionally
+
+7. **Manual duplex silently produced mixed one-pass/two-pass jobs**
+   - `manual_duplex_check` only affected `fitz_entries`; `other_entries` (DOCX, XLS, etc.) still went through ShellExecute/`lp` one-pass, leaving the back side unprinted for those files
+   - Fix: raise `ValueError` early if `other_entries` is non-empty when manual duplex is enabled; surfaces as a print error before any pages are sent
+
+8. **Cancel on reload dialog reported as full success**
+   - User clicking Cancel on the back-side reload prompt caused status bar to show "Sent N file(s) to printer" as if the job completed
+   - Fix: track `manual_duplex_canceled`; show "front sides sent — back-side pass canceled" instead of the normal success message

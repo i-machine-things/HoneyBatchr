@@ -1006,6 +1006,7 @@ class BatchPrintApp(QMainWindow):
 
         self.save_config(silent=True)
         printer_name = self.printer_combo.currentText()
+        manual_duplex_canceled = False
 
         fitz_entries = [
             e for e in self.file_entries
@@ -1039,6 +1040,12 @@ class BatchPrintApp(QMainWindow):
                 )
 
                 if self.manual_duplex_check.isChecked():
+                    if other_entries:
+                        raise ValueError(
+                            "Manual duplex is only supported for PDF/image files "
+                            "rendered by Honey Batchr. Remove unsupported files "
+                            "from the queue or turn off manual duplex."
+                        )
                     front_path = None
                     back_path = None
                     try:
@@ -1070,6 +1077,8 @@ class BatchPrintApp(QMainWindow):
                                     duplex=False, flip_long=False,
                                     paper_size=self.config.get("paper_size", "Letter"),
                                 )
+                            else:
+                                manual_duplex_canceled = True
                     finally:
                         for p in (tmp, front_path, back_path):
                             if p:
@@ -1134,6 +1143,10 @@ class BatchPrintApp(QMainWindow):
 
         if errors:
             QMessageBox.warning(self, "Print Errors", "\n".join(errors))
+        elif manual_duplex_canceled:
+            self.status_bar.showMessage(
+                f"Front sides sent to {printer_name} — back-side pass canceled"
+            )
         else:
             self.status_bar.showMessage(
                 f"Sent {len(self.file_entries)} file(s) to {printer_name}"
