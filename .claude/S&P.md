@@ -44,3 +44,24 @@ Review this file before making changes to the codebase.
 2. **Manual aspect-ratio scaling duplicated PyMuPDF's `keep_proportion`**
    - Manual `scale = min(cell_w/src_w, cell_h/src_h)` logic recomputed what `show_pdf_page(keep_proportion=True)` already does natively
    - Fix: pass `keep_proportion=auto_center` directly to `show_pdf_page` and use the full `cell_rect` in both cases; remove manual scaling
+
+---
+
+## 2026-04-12 — `modules/printing.py` + `modules/app.py` (PR #5 — feat/paper-size-page-setting)
+
+**Review:** CodeRabbit review of Page Setting dialog implementation — 3 actionable findings.
+**Result:** All resolved in `feat/paper-size-page-setting`.
+
+### Findings
+
+1. **Negative page margins accepted silently**
+   - `page_margin_*` values were converted to points without a sign check; negative inputs produced incorrect (expanded) printable area rather than an error
+   - Fix: validate all four margin params are `>= 0` before conversion; raise `ValueError` naming the offending param and value
+
+2. **Page Setting dialog orientation/paper_size not wired end-to-end**
+   - `compose_nup_pdf()` was still reading `self.orientation_combo.currentText()` instead of the stored `page_setting_orientation` config key; `paper_size` was not propagated to `print_pdf_qt()` / `QPrinter`
+   - Fix (commit 45d1016): use `self.config.get("page_setting_orientation", ...)` at the call site; pass `paper_size` to `print_pdf_qt()`; apply `QPageSize` on `QPrinter` before `painter.begin()`
+
+3. **Combined margins not validated against paper dimensions in dialog**
+   - Individual spinboxes bounded to 4 in. each, but `left+right` or `top+bottom` could still exceed the selected sheet side (e.g., A5 at 4"+4"), yielding a non-positive printable area during composition
+   - Fix: override `PageSettingDialog.accept()`; extract `_selected_sheet_size()` helper; compare combined margins to sheet dimensions and show a `QMessageBox.warning` instead of closing if invalid

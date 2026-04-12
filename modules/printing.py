@@ -9,6 +9,16 @@ from PyQt6.QtWidgets import QComboBox
 
 from modules.utils import parse_page_range, slot_to_grid
 
+# Paper sizes in inches (portrait: width x height)
+PAPER_SIZES: dict[str, tuple[float, float]] = {
+    "Letter":  (8.5,   11.0),
+    "Legal":   (8.5,   14.0),
+    "Tabloid": (11.0,  17.0),
+    "A3":      (11.69, 16.54),
+    "A4":      (8.27,  11.69),
+    "A5":      (5.83,   8.27),
+}
+
 
 def populate_printers(combo: QComboBox) -> None:
     """Fill *combo* with available printers, selecting the system default."""
@@ -50,6 +60,11 @@ def compose_nup_pdf(
     orientation: str = "Portrait",
     auto_rotate: bool = True,
     auto_center: bool = True,
+    paper_size: str = "Letter",
+    page_margin_left: float = 0.0,
+    page_margin_right: float = 0.0,
+    page_margin_top: float = 0.0,
+    page_margin_bottom: float = 0.0,
 ) -> str:
     """Render all entries into a single N-up PDF and return its temp path."""
     import fitz  # type: ignore[import]
@@ -93,13 +108,46 @@ def compose_nup_pdf(
     else:
         use_landscape = (orientation == "Landscape")
 
+    base_w, base_h = PAPER_SIZES.get(paper_size, PAPER_SIZES["Letter"])
     if use_landscape:
-        pw, ph = 11.0 * 72, 8.5 * 72
+        pw, ph = base_h * 72, base_w * 72
     else:
-        pw, ph = 8.5 * 72, 11.0 * 72
+        pw, ph = base_w * 72, base_h * 72
 
-    cell_w = (pw - margin_pts * (cols + 1)) / cols
-    cell_h = (ph - margin_pts * (rows + 1)) / rows
+    # Printable area after page margins
+    for _margin_name, _margin_val in (
+        ("page_margin_left", page_margin_left),
+        ("page_margin_right", page_margin_right),
+        ("page_margin_top", page_margin_top),
+        ("page_margin_bottom", page_margin_bottom),
+    ):
+        if _margin_val < 0:
+            raise ValueError(f"{_margin_name} cannot be negative (got {_margin_val}).")
+
+    ml = page_margin_left * 72
+    mr = page_margin_right * 72
+    mt = page_margin_top * 72
+    mb = page_margin_bottom * 72
+    printable_w = pw - ml - mr
+    printable_h = ph - mt - mb
+
+    if printable_w <= 0 or printable_h <= 0:
+        raise ValueError(
+            f"Page margins ({page_margin_left + page_margin_right:.3f} in wide, "
+            f"{page_margin_top + page_margin_bottom:.3f} in tall) exceed the "
+            f"{paper_size} paper dimensions."
+        )
+
+    net_w = printable_w - margin_pts * (cols + 1)
+    net_h = printable_h - margin_pts * (rows + 1)
+    if net_w <= 0 or net_h <= 0:
+        raise ValueError(
+            f"Cell gap ({margin_pts / 72:.3f} in) is too large for "
+            f"{cols}\u00d7{rows} cells on {paper_size} paper."
+        )
+
+    cell_w = net_w / cols
+    cell_h = net_h / rows
 
     out = fitz.open()
 
@@ -120,8 +168,8 @@ def compose_nup_pdf(
             page = out.new_page(width=pw, height=ph)
             for slot, idx in enumerate(slot_indices):
                 col_i, row_i = slot_to_grid(slot, cols, rows, order)
-                x0 = margin_pts + col_i * (cell_w + margin_pts)
-                y0 = margin_pts + row_i * (cell_h + margin_pts)
+                x0 = ml + margin_pts + col_i * (cell_w + margin_pts)
+                y0 = mt + margin_pts + row_i * (cell_h + margin_pts)
                 cell_rect = fitz.Rect(x0, y0, x0 + cell_w, y0 + cell_h)
 
                 # Auto-rotate: if page and cell have mismatched orientations, rotate 90°
@@ -166,6 +214,7 @@ def compose_nup_pdf(
     return tmp_path
 
 
+
 def print_pdf_qt(
     pdf_path: str,
     printer_name: str,
@@ -173,11 +222,12 @@ def print_pdf_qt(
     grayscale: bool,
     duplex: bool,
     flip_long: bool,
+    paper_size: str = "Letter",
 ) -> None:
     """Print a composed PDF via QPrinter/QPainter."""
     import fitz  # type: ignore[import]
     from PyQt6.QtPrintSupport import QPrinter, QPrinterInfo
-    from PyQt6.QtGui import QImage, QPainter, QPageLayout
+    from PyQt6.QtGui import QImage, QPainter, QPageLayout, QPageSize
     from PyQt6.QtCore import QRect
 
     matches = [p for p in QPrinterInfo.availablePrinters()
@@ -200,6 +250,10 @@ def print_pdf_qt(
         )
     else:
         printer.setDuplex(QPrinter.DuplexMode.DuplexNone)
+
+    # Apply selected paper size to the print driver
+    ps_id = getattr(QPageSize.PageSizeId, paper_size, QPageSize.PageSizeId.Letter)
+    printer.setPageSize(QPageSize(ps_id))
 
     # Match QPrinter orientation to the composed PDF's page dimensions
     try:
