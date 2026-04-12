@@ -1039,10 +1039,12 @@ class BatchPrintApp(QMainWindow):
                 )
 
                 if self.manual_duplex_check.isChecked():
-                    front_path, back_path = split_for_manual_duplex(
-                        tmp, self.reverse_back_check.isChecked()
-                    )
+                    front_path = None
+                    back_path = None
                     try:
+                        front_path, back_path = split_for_manual_duplex(
+                            tmp, self.reverse_back_check.isChecked()
+                        )
                         print_pdf_qt(
                             front_path, printer_name,
                             copies=self.copies_spin.value(),

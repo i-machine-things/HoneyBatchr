@@ -241,12 +241,29 @@ def split_for_manual_duplex(pdf_path: str, reverse_back: bool) -> tuple:
         tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
         path = tmp.name
         tmp.close()
-        sub.save(path)
+        try:
+            sub.save(path)
+        except Exception:
+            sub.close()
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+            raise
         sub.close()
         return path
 
     front_path = _subset(front_indices)
-    back_path  = _subset(back_indices) if back_indices else None
+    back_path = None
+    if back_indices:
+        try:
+            back_path = _subset(back_indices)
+        except Exception:
+            try:
+                os.unlink(front_path)
+            except OSError:
+                pass
+            raise
     return front_path, back_path
 
 

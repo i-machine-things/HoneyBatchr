@@ -65,3 +65,24 @@ Review this file before making changes to the codebase.
 3. **Combined margins not validated against paper dimensions in dialog**
    - Individual spinboxes bounded to 4 in. each, but `left+right` or `top+bottom` could still exceed the selected sheet side (e.g., A5 at 4"+4"), yielding a non-positive printable area during composition
    - Fix: override `PageSettingDialog.accept()`; extract `_selected_sheet_size()` helper; compare combined margins to sheet dimensions and show a `QMessageBox.warning` instead of closing if invalid
+
+---
+
+## 2026-04-12 — `modules/printing.py` + `modules/app.py` (PR #6 — feat/manual-duplex)
+
+**Review:** CodeRabbit review of manual duplex two-pass implementation — 3 temp file leak findings.
+**Result:** All 3 fixed.
+
+### Findings
+
+1. **`tmp` leaks if `split_for_manual_duplex()` raises before `try` block**
+   - `front_path`/`back_path` uninitialized when `split_for_manual_duplex` was called outside `try/finally`; if it raised, `tmp` was never unlinked
+   - Fix: initialize `front_path = None`, `back_path = None`; move `split_for_manual_duplex` call inside the `try` block so `finally` always runs
+
+2. **`front_path` leaks if `_subset(back_indices)` raises**
+   - `_subset(front_indices)` succeeded but `_subset(back_indices)` could raise; front temp file left behind
+   - Fix: wrap back-side `_subset` call in `try/except`; unlink `front_path` before re-raising
+
+3. **Temp file leaks inside `_subset` if `sub.save()` fails**
+   - On disk-full or I/O error, the temp file was created but never cleaned up
+   - Fix: wrap `sub.save()` in `try/except`; close `sub` and unlink the temp file before re-raising; mirrors the pattern in `compose_nup_pdf`
