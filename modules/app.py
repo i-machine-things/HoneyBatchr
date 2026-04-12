@@ -44,15 +44,18 @@ class _PaperPreview(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         cw, ch = self.width(), self.height()
-        padding = 28
-        avail_w = cw - padding * 2
-        avail_h = ch - padding * 2
+        pad_left = 28   # room for height label
+        pad_top = 40    # room for width label + line
+        pad_right = 12
+        pad_bottom = 12
+        avail_w = cw - pad_left - pad_right
+        avail_h = ch - pad_top - pad_bottom
 
         scale = min(avail_w / self._w_in, avail_h / self._h_in)
         rw = self._w_in * scale
         rh = self._h_in * scale
-        rx = (cw - rw) / 2
-        ry = (ch - rh) / 2
+        rx = pad_left + (avail_w - rw) / 2
+        ry = pad_top + (avail_h - rh) / 2
 
         # Shadow
         p.setPen(Qt.PenStyle.NoPen)
@@ -73,16 +76,16 @@ class _PaperPreview(QWidget):
         w_label = f"{self._w_in:.3f} inch"
         h_label = f"{self._h_in:.3f} inch"
 
-        # Width label — centred above
+        # Width label — text above the dimension line
         p.drawText(
-            QRectF(rx, ry - 18, rw, 16),
+            QRectF(rx, ry - 36, rw, 16),
             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
             w_label,
         )
-        # Arrows for width
-        p.drawLine(int(rx), int(ry - 10), int(rx + rw), int(ry - 10))
-        p.drawLine(int(rx), int(ry - 14), int(rx), int(ry - 6))
-        p.drawLine(int(rx + rw), int(ry - 14), int(rx + rw), int(ry - 6))
+        # Dimension line and end ticks below the text
+        p.drawLine(int(rx), int(ry - 16), int(rx + rw), int(ry - 16))
+        p.drawLine(int(rx), int(ry - 20), int(rx), int(ry - 12))
+        p.drawLine(int(rx + rw), int(ry - 20), int(rx + rw), int(ry - 12))
 
         # Height label — rotated on left side
         p.save()
