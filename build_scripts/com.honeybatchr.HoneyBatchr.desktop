@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Honey Batchr
+Comment=Batch Printing Application
+Exec=honeybatchr
+Icon=com.honeybatchr.HoneyBatchr
+Type=Application
+Categories=Office;
+StartupNotify=true
+StartupWMClass=HoneyBatchr
