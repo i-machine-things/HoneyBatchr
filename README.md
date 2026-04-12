@@ -73,8 +73,10 @@ Produces `dist\HoneyBatchr.exe` via PyInstaller.
 **Linux:**
 ```bash
 python -m PyInstaller build_scripts/HoneyBatchr.spec --clean --noconfirm
+flatpak-builder --user --install --force-clean flatpak-build build_scripts/com.honeybatchr.HoneyBatchr.yml
+flatpak build-bundle ~/.local/share/flatpak/repo HoneyBatchr-linux.flatpak com.honeybatchr.HoneyBatchr
 ```
-Produces `dist/HoneyBatchr/HoneyBatchr` (one-dir bundle).
+Produces a `.flatpak` bundle (Flatpak wrapping the PyInstaller one-dir build).
 
 CI builds both platforms on every version tag and attaches both artifacts to the GitHub release.
 

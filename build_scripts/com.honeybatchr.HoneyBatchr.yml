@@ -1,0 +1,28 @@
+app-id: com.honeybatchr.HoneyBatchr
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: honeybatchr
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --filesystem=home
+  - --socket=cups
+
+modules:
+  - name: HoneyBatchr
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/lib/honeybatchr
+      - cp -r . /app/lib/honeybatchr/
+      - chmod +x /app/lib/honeybatchr/HoneyBatchr
+      - install -Dm755 honeybatchr.sh /app/bin/honeybatchr
+    sources:
+      - type: dir
+        path: ../dist/HoneyBatchr
+      - type: script
+        dest-filename: honeybatchr.sh
+        commands:
+          - exec /app/lib/honeybatchr/HoneyBatchr "$@"
