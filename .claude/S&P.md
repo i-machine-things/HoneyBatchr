@@ -86,3 +86,7 @@ Review this file before making changes to the codebase.
 3. **Temp file leaks inside `_subset` if `sub.save()` fails**
    - On disk-full or I/O error, the temp file was created but never cleaned up
    - Fix: wrap `sub.save()` in `try/except`; close `sub` and unlink the temp file before re-raising; mirrors the pattern in `compose_nup_pdf`
+
+4. **Nitpick: `tuple` return annotation too generic on `split_for_manual_duplex`**
+   - Generic `tuple` gives IDEs and type checkers no useful information
+   - Fix: annotate as `tuple[str, str | None]` — no import needed (Python 3.10+ built-in generics)

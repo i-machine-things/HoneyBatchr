@@ -214,7 +214,7 @@ def compose_nup_pdf(
     return tmp_path
 
 
-def split_for_manual_duplex(pdf_path: str, reverse_back: bool) -> tuple:
+def split_for_manual_duplex(pdf_path: str, reverse_back: bool) -> tuple[str, str | None]:
     """Split a composed PDF into front and back temp files for two-pass manual duplex.
 
     Front pass: sheets at positions 0, 2, 4, ...
