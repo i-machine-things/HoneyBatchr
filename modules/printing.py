@@ -115,6 +115,15 @@ def compose_nup_pdf(
         pw, ph = base_w * 72, base_h * 72
 
     # Printable area after page margins
+    for _margin_name, _margin_val in (
+        ("page_margin_left", page_margin_left),
+        ("page_margin_right", page_margin_right),
+        ("page_margin_top", page_margin_top),
+        ("page_margin_bottom", page_margin_bottom),
+    ):
+        if _margin_val < 0:
+            raise ValueError(f"{_margin_name} cannot be negative (got {_margin_val}).")
+
     ml = page_margin_left * 72
     mr = page_margin_right * 72
     mt = page_margin_top * 72
