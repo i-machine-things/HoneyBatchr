@@ -64,11 +64,19 @@ python main.py "C:\docs\file1.pdf" "C:\docs\file2.pdf"
 
 ## Building
 
+**Windows:**
 ```bash
 build.bat
 ```
-
 Produces `dist\HoneyBatchr.exe` via PyInstaller.
+
+**Linux:**
+```bash
+python -m PyInstaller build_scripts/HoneyBatchr.spec --clean --noconfirm
+```
+Produces `dist/HoneyBatchr/HoneyBatchr` (one-dir bundle).
+
+CI builds both platforms on every version tag and attaches both artifacts to the GitHub release.
 
 ---
 
@@ -102,8 +110,9 @@ Settings are stored on the file entry and applied during composition.
 HoneyBatchr/
 ├── main.py                      # Entire application
 ├── requirements.txt
-├── batch_print.spec             # PyInstaller spec
 ├── build.bat
+├── build_scripts/
+│   └── HoneyBatchr.spec         # PyInstaller spec
 ├── register_context_menu.bat    # Add right-click menu (run as Admin)
 ├── unregister_context_menu.bat  # Remove right-click menu (run as Admin)
 ├── create_icons.py              # Generates resources/badger.*

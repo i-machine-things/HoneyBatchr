@@ -6,7 +6,7 @@ on:
       - "v*"
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
     permissions:
       contents: write
@@ -35,3 +35,40 @@ jobs:
         with:
           files: HoneyBatchr-${{ github.ref_name }}-windows.zip
           generate_release_notes: true
+
+  build-linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 \
+            libxkbcommon-x11-0
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: python -m PyInstaller build_scripts/HoneyBatchr.spec --clean --noconfirm
+
+      - name: Package release artifact
+        run: tar -czf HoneyBatchr-${{ github.ref_name }}-linux.tar.gz -C dist HoneyBatchr
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: HoneyBatchr-${{ github.ref_name }}-linux.tar.gz
+          generate_release_notes: false
