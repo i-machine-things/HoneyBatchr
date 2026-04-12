@@ -22,7 +22,7 @@ from modules.utils import FITZ_EXTS, pdf_page_count
 from modules.themes import light_palette, dark_palette, STYLESHEET
 from modules.widgets import DroppableTable
 from modules.dialogs import PageConfigDialog
-from modules.printing import populate_printers, compose_nup_pdf, print_pdf_qt, PAPER_SIZES
+from modules.printing import populate_printers, compose_nup_pdf, print_pdf_qt, split_for_manual_duplex, PAPER_SIZES
 
 
 class _PaperPreview(QWidget):
@@ -624,6 +624,21 @@ class BatchPrintApp(QMainWindow):
         layout.addWidget(flip_indent)
         self._toggle_duplex(self.duplex_check.isChecked())
 
+        self.manual_duplex_check = QCheckBox("Manual duplex (two-pass)")
+        self.manual_duplex_check.setChecked(self.config.get("manual_duplex", False))
+        self.manual_duplex_check.toggled.connect(self._toggle_manual_duplex)
+        layout.addWidget(self.manual_duplex_check)
+
+        md_indent = QWidget()
+        md_layout = QVBoxLayout(md_indent)
+        md_layout.setContentsMargins(16, 0, 0, 0)
+        md_layout.setSpacing(2)
+        self.reverse_back_check = QCheckBox("Reverse back-side order")
+        self.reverse_back_check.setChecked(self.config.get("reverse_back", True))
+        md_layout.addWidget(self.reverse_back_check)
+        layout.addWidget(md_indent)
+        self._toggle_manual_duplex(self.manual_duplex_check.isChecked())
+
         self.auto_rotate_check = QCheckBox("Auto-Rotate")
         self.auto_rotate_check.setChecked(self.config.get("auto_rotate", True))
         layout.addWidget(self.auto_rotate_check)
@@ -739,6 +754,13 @@ class BatchPrintApp(QMainWindow):
     def _toggle_duplex(self, checked: bool):
         self.flip_long_radio.setEnabled(checked)
         self.flip_short_radio.setEnabled(checked)
+        if checked and self.manual_duplex_check.isChecked():
+            self.manual_duplex_check.setChecked(False)
+
+    def _toggle_manual_duplex(self, checked: bool):
+        self.reverse_back_check.setEnabled(checked)
+        if checked and self.duplex_check.isChecked():
+            self.duplex_check.setChecked(False)
 
     def _on_copies_changed(self, value: int):
         self.collate_check.setEnabled(value > 1)
@@ -1015,15 +1037,54 @@ class BatchPrintApp(QMainWindow):
                     page_margin_top=self.config.get("page_margin_top", 0.02),
                     page_margin_bottom=self.config.get("page_margin_bottom", 0.02),
                 )
-                print_pdf_qt(
-                    tmp,
-                    printer_name,
-                    copies=self.copies_spin.value(),
-                    grayscale=self.grayscale_check.isChecked(),
-                    duplex=self.duplex_check.isChecked(),
-                    flip_long=self.flip_long_radio.isChecked(),
-                    paper_size=self.config.get("paper_size", "Letter"),
-                )
+
+                if self.manual_duplex_check.isChecked():
+                    front_path, back_path = split_for_manual_duplex(
+                        tmp, self.reverse_back_check.isChecked()
+                    )
+                    try:
+                        print_pdf_qt(
+                            front_path, printer_name,
+                            copies=self.copies_spin.value(),
+                            grayscale=self.grayscale_check.isChecked(),
+                            duplex=False, flip_long=False,
+                            paper_size=self.config.get("paper_size", "Letter"),
+                        )
+                        if back_path:
+                            reply = QMessageBox.information(
+                                self,
+                                "Manual Duplex — Reload Paper",
+                                "Front sides have been sent to the printer.\n\n"
+                                "Once printing is complete, reload the pages into "
+                                "the paper tray and click OK to print the back sides.",
+                                QMessageBox.StandardButton.Ok
+                                | QMessageBox.StandardButton.Cancel,
+                            )
+                            if reply == QMessageBox.StandardButton.Ok:
+                                print_pdf_qt(
+                                    back_path, printer_name,
+                                    copies=self.copies_spin.value(),
+                                    grayscale=self.grayscale_check.isChecked(),
+                                    duplex=False, flip_long=False,
+                                    paper_size=self.config.get("paper_size", "Letter"),
+                                )
+                    finally:
+                        for p in (tmp, front_path, back_path):
+                            if p:
+                                try:
+                                    os.unlink(p)
+                                except OSError:
+                                    pass
+                else:
+                    print_pdf_qt(
+                        tmp,
+                        printer_name,
+                        copies=self.copies_spin.value(),
+                        grayscale=self.grayscale_check.isChecked(),
+                        duplex=self.duplex_check.isChecked(),
+                        flip_long=self.flip_long_radio.isChecked(),
+                        paper_size=self.config.get("paper_size", "Letter"),
+                    )
             except Exception as e:
                 errors.append(f"Rendered print failed: {e}")
 
@@ -1081,6 +1142,8 @@ class BatchPrintApp(QMainWindow):
                 "print_as_image": self.print_as_image_check.isChecked(),
                 "bleed_marks": self.bleed_marks_check.isChecked(),
                 "duplex": self.duplex_check.isChecked(),
+                "manual_duplex": self.manual_duplex_check.isChecked(),
+                "reverse_back": self.reverse_back_check.isChecked(),
                 "auto_rotate": self.auto_rotate_check.isChecked(),
                 "auto_center": self.auto_center_check.isChecked(),
                 "orientation": self.orientation_combo.currentText(),

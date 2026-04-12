@@ -12,6 +12,8 @@ DEFAULT_CONFIG: dict = {
     "print_as_image": False,
     "bleed_marks": False,
     "duplex": False,
+    "manual_duplex": False,
+    "reverse_back": True,
     "auto_rotate": True,
     "auto_center": True,
     "orientation": "Portrait",
