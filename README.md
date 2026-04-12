@@ -165,5 +165,4 @@ HoneyBatchr/
 - [ ] Print preview for the full job before sending
 - [ ] Recent files list
 
-### Known issues
-- [x] Page Config dialog right panel shifts slightly on first show (layout settles after first render)
+

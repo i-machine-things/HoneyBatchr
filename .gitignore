@@ -138,3 +138,7 @@ Thumbs.db
 config.json
 *.bak
 .claude/settings.local.json
+
+# Flatpak build cache
+.flatpak-builder/
+flatpak-build/
