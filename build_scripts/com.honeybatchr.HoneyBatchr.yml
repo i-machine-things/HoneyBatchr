@@ -19,6 +19,12 @@ modules:
       - cp -r . /app/lib/honeybatchr/
       - chmod +x /app/lib/honeybatchr/HoneyBatchr
       - install -Dm755 honeybatchr.sh /app/bin/honeybatchr
+      - install -Dm644 com.honeybatchr.HoneyBatchr.desktop /app/share/applications/com.honeybatchr.HoneyBatchr.desktop
+      - install -Dm644 icon_256.png /app/share/icons/hicolor/256x256/apps/com.honeybatchr.HoneyBatchr.png
+      - install -Dm644 icon_128.png /app/share/icons/hicolor/128x128/apps/com.honeybatchr.HoneyBatchr.png
+      - install -Dm644 icon_64.png /app/share/icons/hicolor/64x64/apps/com.honeybatchr.HoneyBatchr.png
+      - install -Dm644 icon_48.png /app/share/icons/hicolor/48x48/apps/com.honeybatchr.HoneyBatchr.png
+      - install -Dm644 icon_32.png /app/share/icons/hicolor/32x32/apps/com.honeybatchr.HoneyBatchr.png
     sources:
       - type: dir
         path: ../dist/HoneyBatchr
@@ -26,3 +32,20 @@ modules:
         dest-filename: honeybatchr.sh
         commands:
           - exec /app/lib/honeybatchr/HoneyBatchr "$@"
+      - type: file
+        path: com.honeybatchr.HoneyBatchr.desktop
+      - type: file
+        path: ../resources/badger_256.png
+        dest-filename: icon_256.png
+      - type: file
+        path: ../resources/badger_128.png
+        dest-filename: icon_128.png
+      - type: file
+        path: ../resources/badger_64.png
+        dest-filename: icon_64.png
+      - type: file
+        path: ../resources/badger_48.png
+        dest-filename: icon_48.png
+      - type: file
+        path: ../resources/badger_32.png
+        dest-filename: icon_32.png
