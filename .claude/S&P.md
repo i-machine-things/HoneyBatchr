@@ -90,3 +90,11 @@ Review this file before making changes to the codebase.
 4. **Nitpick: `tuple` return annotation too generic on `split_for_manual_duplex`**
    - Generic `tuple` gives IDEs and type checkers no useful information
    - Fix: annotate as `tuple[str, str | None]` — no import needed (Python 3.10+ built-in generics)
+
+5. **`_toggle_duplex()` called before `manual_duplex_check` exists**
+   - Init called `_toggle_duplex(...)` at line 625, but `manual_duplex_check` wasn't created until line 627; if duplex starts enabled this raises `AttributeError`
+   - Fix: move `_toggle_duplex(...)` call to after both `manual_duplex_check` and `reverse_back_check` are created
+
+6. **`tmp` never unlinked in non-manual print path**
+   - The hardware-duplex `else` branch printed `tmp` but never deleted it, leaking one temp PDF per print run
+   - Fix: wrap `print_pdf_qt` in `try/finally`; unlink `tmp` unconditionally

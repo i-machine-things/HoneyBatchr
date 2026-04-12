@@ -622,7 +622,6 @@ class BatchPrintApp(QMainWindow):
         fi_layout.addWidget(self.flip_long_radio)
         fi_layout.addWidget(self.flip_short_radio)
         layout.addWidget(flip_indent)
-        self._toggle_duplex(self.duplex_check.isChecked())
 
         self.manual_duplex_check = QCheckBox("Manual duplex (two-pass)")
         self.manual_duplex_check.setChecked(self.config.get("manual_duplex", False))
@@ -637,6 +636,7 @@ class BatchPrintApp(QMainWindow):
         self.reverse_back_check.setChecked(self.config.get("reverse_back", True))
         md_layout.addWidget(self.reverse_back_check)
         layout.addWidget(md_indent)
+        self._toggle_duplex(self.duplex_check.isChecked())
         self._toggle_manual_duplex(self.manual_duplex_check.isChecked())
 
         self.auto_rotate_check = QCheckBox("Auto-Rotate")
@@ -1078,15 +1078,21 @@ class BatchPrintApp(QMainWindow):
                                 except OSError:
                                     pass
                 else:
-                    print_pdf_qt(
-                        tmp,
-                        printer_name,
-                        copies=self.copies_spin.value(),
-                        grayscale=self.grayscale_check.isChecked(),
-                        duplex=self.duplex_check.isChecked(),
-                        flip_long=self.flip_long_radio.isChecked(),
-                        paper_size=self.config.get("paper_size", "Letter"),
-                    )
+                    try:
+                        print_pdf_qt(
+                            tmp,
+                            printer_name,
+                            copies=self.copies_spin.value(),
+                            grayscale=self.grayscale_check.isChecked(),
+                            duplex=self.duplex_check.isChecked(),
+                            flip_long=self.flip_long_radio.isChecked(),
+                            paper_size=self.config.get("paper_size", "Letter"),
+                        )
+                    finally:
+                        try:
+                            os.unlink(tmp)
+                        except OSError:
+                            pass
             except Exception as e:
                 errors.append(f"Rendered print failed: {e}")
 
