@@ -110,8 +110,9 @@ Settings are stored on the file entry and applied during composition.
 HoneyBatchr/
 ├── main.py                      # Entire application
 ├── requirements.txt
-├── batch_print.spec             # PyInstaller spec
 ├── build.bat
+├── build_scripts/
+│   └── HoneyBatchr.spec         # PyInstaller spec
 ├── register_context_menu.bat    # Add right-click menu (run as Admin)
 ├── unregister_context_menu.bat  # Remove right-click menu (run as Admin)
 ├── create_icons.py              # Generates resources/badger.*
