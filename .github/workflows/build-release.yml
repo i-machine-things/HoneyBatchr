@@ -81,7 +81,8 @@ jobs:
           flatpak build-bundle \
             ~/.local/share/flatpak/repo \
             HoneyBatchr-${{ github.ref_name }}-linux.flatpak \
-            com.honeybatchr.HoneyBatchr
+            com.honeybatchr.HoneyBatchr \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2

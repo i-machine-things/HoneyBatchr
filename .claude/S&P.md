@@ -106,3 +106,20 @@ Review this file before making changes to the codebase.
 8. **Cancel on reload dialog reported as full success**
    - User clicking Cancel on the back-side reload prompt caused status bar to show "Sent N file(s) to printer" as if the job completed
    - Fix: track `manual_duplex_canceled`; show "front sides sent — back-side pass canceled" instead of the normal success message
+
+---
+
+## 2026-04-12 — `.github/workflows/build-release.yml` + `README.md` (PR #8 — feat/linux-flatpak-build)
+
+**Review:** CodeRabbit review of Linux Flatpak build — 2 actionable findings.
+**Result:** Both fixed.
+
+### Findings
+
+1. **`flatpak build-bundle` missing `--runtime-repo`**
+   - Bundle was produced without embedding runtime repository metadata; users on clean machines (no Flathub remote) would fail to install if required runtimes were absent
+   - Fix: add `--runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo` to the `flatpak build-bundle` invocation in CI
+
+2. **README Linux build steps missing Flatpak prerequisites**
+   - The documented manual build commands assumed Flathub remote and runtime/SDK were already installed; would fail on a clean system
+   - Fix: prepend `flatpak remote-add` and `flatpak install` steps to the README Linux build section; also added `--runtime-repo` to the documented `flatpak build-bundle` command
