@@ -44,7 +44,7 @@ class _PaperPreview(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         cw, ch = self.width(), self.height()
-        pad_left = 28   # room for height label
+        pad_left = 44   # room for height label
         pad_top = 40    # room for width label + line
         pad_right = 12
         pad_bottom = 12
@@ -89,7 +89,7 @@ class _PaperPreview(QWidget):
 
         # Height label — rotated on left side
         p.save()
-        p.translate(rx - 10, ry + rh / 2)
+        p.translate(rx - 20, ry + rh / 2)
         p.rotate(-90)
         p.drawText(
             QRectF(-rh / 2, -16, rh, 16),
@@ -97,9 +97,9 @@ class _PaperPreview(QWidget):
             h_label,
         )
         p.restore()
-        p.drawLine(int(rx - 4), int(ry), int(rx - 4), int(ry + rh))
-        p.drawLine(int(rx - 8), int(ry), int(rx), int(ry))
-        p.drawLine(int(rx - 8), int(ry + rh), int(rx), int(ry + rh))
+        p.drawLine(int(rx - 16), int(ry), int(rx - 16), int(ry + rh))
+        p.drawLine(int(rx - 20), int(ry), int(rx - 12), int(ry))
+        p.drawLine(int(rx - 20), int(ry + rh), int(rx - 12), int(ry + rh))
 
         p.end()
 
