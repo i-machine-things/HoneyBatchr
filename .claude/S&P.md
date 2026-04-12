@@ -65,3 +65,44 @@ Review this file before making changes to the codebase.
 3. **Combined margins not validated against paper dimensions in dialog**
    - Individual spinboxes bounded to 4 in. each, but `left+right` or `top+bottom` could still exceed the selected sheet side (e.g., A5 at 4"+4"), yielding a non-positive printable area during composition
    - Fix: override `PageSettingDialog.accept()`; extract `_selected_sheet_size()` helper; compare combined margins to sheet dimensions and show a `QMessageBox.warning` instead of closing if invalid
+
+---
+
+## 2026-04-12 — `modules/printing.py` + `modules/app.py` (PR #6 — feat/manual-duplex)
+
+**Review:** CodeRabbit review of manual duplex two-pass implementation — 3 temp file leak findings.
+**Result:** All 3 fixed.
+
+### Findings
+
+1. **`tmp` leaks if `split_for_manual_duplex()` raises before `try` block**
+   - `front_path`/`back_path` uninitialized when `split_for_manual_duplex` was called outside `try/finally`; if it raised, `tmp` was never unlinked
+   - Fix: initialize `front_path = None`, `back_path = None`; move `split_for_manual_duplex` call inside the `try` block so `finally` always runs
+
+2. **`front_path` leaks if `_subset(back_indices)` raises**
+   - `_subset(front_indices)` succeeded but `_subset(back_indices)` could raise; front temp file left behind
+   - Fix: wrap back-side `_subset` call in `try/except`; unlink `front_path` before re-raising
+
+3. **Temp file leaks inside `_subset` if `sub.save()` fails**
+   - On disk-full or I/O error, the temp file was created but never cleaned up
+   - Fix: wrap `sub.save()` in `try/except`; close `sub` and unlink the temp file before re-raising; mirrors the pattern in `compose_nup_pdf`
+
+4. **Nitpick: `tuple` return annotation too generic on `split_for_manual_duplex`**
+   - Generic `tuple` gives IDEs and type checkers no useful information
+   - Fix: annotate as `tuple[str, str | None]` — no import needed (Python 3.10+ built-in generics)
+
+5. **`_toggle_duplex()` called before `manual_duplex_check` exists**
+   - Init called `_toggle_duplex(...)` at line 625, but `manual_duplex_check` wasn't created until line 627; if duplex starts enabled this raises `AttributeError`
+   - Fix: move `_toggle_duplex(...)` call to after both `manual_duplex_check` and `reverse_back_check` are created
+
+6. **`tmp` never unlinked in non-manual print path**
+   - The hardware-duplex `else` branch printed `tmp` but never deleted it, leaking one temp PDF per print run
+   - Fix: wrap `print_pdf_qt` in `try/finally`; unlink `tmp` unconditionally
+
+7. **Manual duplex silently produced mixed one-pass/two-pass jobs**
+   - `manual_duplex_check` only affected `fitz_entries`; `other_entries` (DOCX, XLS, etc.) still went through ShellExecute/`lp` one-pass, leaving the back side unprinted for those files
+   - Fix: raise `ValueError` early if `other_entries` is non-empty when manual duplex is enabled; surfaces as a print error before any pages are sent
+
+8. **Cancel on reload dialog reported as full success**
+   - User clicking Cancel on the back-side reload prompt caused status bar to show "Sent N file(s) to printer" as if the job completed
+   - Fix: track `manual_duplex_canceled`; show "front sides sent — back-side pass canceled" instead of the normal success message

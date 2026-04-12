@@ -9,7 +9,7 @@ A batch printing application built with PyQt6. Matches the Adobe Acrobat Batch P
 - **Batch file queue** — table view with Number, Name, Modified, Range, Copies, Size, Location, State columns
 - **Drag & drop** — drop files directly onto the file table
 - **N-up printing** — compose 1, 2, 4, 6, 8, 9, or 16 pages per sheet with configurable page order and margins
-- **Duplex printing** — flip on long edge or short edge via QPrinter (no admin rights required)
+- **Duplex printing** — hardware duplex (flip on long or short edge via QPrinter) or **manual duplex** (two-pass: prints front sides, prompts to reload paper, prints back sides with optional stack reversal for face-down trays)
 - **Orientation** — Portrait, Landscape, or Auto (detects majority orientation of pages to be printed); Auto-Rotate fits each page to its N-up cell; Auto-Center preserves aspect ratio with whitespace padding
 - **Paper size** — Letter, Legal, Tabloid, A3, A4, A5; configurable per-side page margins (inch) via Page Setting dialog with live preview
 - **Grayscale / color** — per-job color mode

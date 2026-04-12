@@ -214,6 +214,58 @@ def compose_nup_pdf(
     return tmp_path
 
 
+def split_for_manual_duplex(pdf_path: str, reverse_back: bool) -> tuple[str, str | None]:
+    """Split a composed PDF into front and back temp files for two-pass manual duplex.
+
+    Front pass: sheets at positions 0, 2, 4, ...
+    Back pass:  sheets at positions 1, 3, 5, ... (reversed when *reverse_back* is True,
+                which is correct for face-down output trays so the sheets realign).
+
+    Returns (front_path, back_path).  back_path is None when the source has only one
+    sheet.  Caller owns both files and must unlink them after printing.
+    """
+    import fitz
+
+    doc = fitz.open(pdf_path)
+    n = len(doc)
+    doc.close()
+
+    front_indices = list(range(0, n, 2))
+    back_indices  = list(range(1, n, 2))
+    if reverse_back:
+        back_indices = list(reversed(back_indices))
+
+    def _subset(indices: list) -> str:
+        sub = fitz.open(pdf_path)
+        sub.select(indices)
+        tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+        path = tmp.name
+        tmp.close()
+        try:
+            sub.save(path)
+        except Exception:
+            sub.close()
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+            raise
+        sub.close()
+        return path
+
+    front_path = _subset(front_indices)
+    back_path = None
+    if back_indices:
+        try:
+            back_path = _subset(back_indices)
+        except Exception:
+            try:
+                os.unlink(front_path)
+            except OSError:
+                pass
+            raise
+    return front_path, back_path
+
 
 def print_pdf_qt(
     pdf_path: str,
