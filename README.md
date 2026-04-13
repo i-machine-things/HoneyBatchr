@@ -66,9 +66,12 @@ python main.py "C:\docs\file1.pdf" "C:\docs\file2.pdf"
 
 **Windows:**
 ```bash
-build.bat
+python -m PyInstaller build_scripts/HoneyBatchr.spec --clean --noconfirm
+set RELEASE_VERSION=dev
+iscc build_scripts\HoneyBatchr.iss
 ```
-Produces `dist\HoneyBatchr.exe` via PyInstaller.
+Produces `installer_out\HoneyBatchr-dev-windows-setup.exe` via PyInstaller + Inno Setup.
+Inno Setup is available at https://jrsoftware.org/isinfo.php.
 
 **Linux:**
 ```bash

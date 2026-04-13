@@ -142,3 +142,6 @@ config.json
 # Flatpak build cache
 .flatpak-builder/
 flatpak-build/
+
+# Inno Setup output
+installer_out/
