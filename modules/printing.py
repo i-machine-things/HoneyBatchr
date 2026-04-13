@@ -221,6 +221,11 @@ def split_for_manual_duplex(pdf_path: str, reverse_back: bool) -> tuple[str, str
     Back pass:  sheets at positions 1, 3, 5, ... (reversed when *reverse_back* is True,
                 which is correct for face-down output trays so the sheets realign).
 
+    When *reverse_back* is True and the page count is odd, the last physical sheet
+    (front-side only) feeds through the printer first on the back pass.  A blank page
+    is prepended to the back-side PDF so that sheet passes through without receiving
+    any image, keeping every sheet's back page in the correct position.
+
     Returns (front_path, back_path).  back_path is None when the source has only one
     sheet.  Caller owns both files and must unlink them after printing.
     """
@@ -232,12 +237,21 @@ def split_for_manual_duplex(pdf_path: str, reverse_back: bool) -> tuple[str, str
 
     front_indices = list(range(0, n, 2))
     back_indices  = list(range(1, n, 2))
+
+    # With face-down reload (reverse_back=True), the last-printed sheet feeds first.
+    # When the page count is odd, that sheet has no back side and needs a blank page
+    # as the first entry in the back-side PDF to absorb it.
+    needs_leading_blank = reverse_back and len(front_indices) > len(back_indices)
+
     if reverse_back:
         back_indices = list(reversed(back_indices))
 
-    def _subset(indices: list) -> str:
+    def _subset(indices: list, leading_blank: bool = False) -> str:
         sub = fitz.open(pdf_path)
         sub.select(indices)
+        if leading_blank:
+            ref = sub[0].rect
+            sub.insert_page(0, width=ref.width, height=ref.height)
         tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
         path = tmp.name
         tmp.close()
@@ -257,7 +271,7 @@ def split_for_manual_duplex(pdf_path: str, reverse_back: bool) -> tuple[str, str
     back_path = None
     if back_indices:
         try:
-            back_path = _subset(back_indices)
+            back_path = _subset(back_indices, leading_blank=needs_leading_blank)
         except Exception:
             try:
                 os.unlink(front_path)
