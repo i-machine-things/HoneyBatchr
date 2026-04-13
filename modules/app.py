@@ -631,10 +631,18 @@ class BatchPrintApp(QMainWindow):
         md_indent = QWidget()
         md_layout = QVBoxLayout(md_indent)
         md_layout.setContentsMargins(16, 0, 0, 0)
-        md_layout.setSpacing(2)
-        self.reverse_back_check = QCheckBox("Reverse back-side order")
-        self.reverse_back_check.setChecked(self.config.get("reverse_back", True))
-        md_layout.addWidget(self.reverse_back_check)
+        md_layout.setSpacing(4)
+        self._printer_style_label = QLabel("Printer output:")
+        md_layout.addWidget(self._printer_style_label)
+        self.printer_style_combo = QComboBox()
+        self.printer_style_combo.addItems([
+            "Face-down (most printers)",
+            "Face-up / straight-through",
+        ])
+        saved_style = self.config.get("printer_style", "Face-down (most printers)")
+        idx = self.printer_style_combo.findText(saved_style)
+        self.printer_style_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        md_layout.addWidget(self.printer_style_combo)
         layout.addWidget(md_indent)
         self._toggle_duplex(self.duplex_check.isChecked())
         self._toggle_manual_duplex(self.manual_duplex_check.isChecked())
@@ -758,9 +766,33 @@ class BatchPrintApp(QMainWindow):
             self.manual_duplex_check.setChecked(False)
 
     def _toggle_manual_duplex(self, checked: bool):
-        self.reverse_back_check.setEnabled(checked)
+        self._printer_style_label.setEnabled(checked)
+        self.printer_style_combo.setEnabled(checked)
         if checked and self.duplex_check.isChecked():
             self.duplex_check.setChecked(False)
+
+    def _manual_duplex_reverse_back(self) -> bool:
+        """Return True when the selected printer style requires back-page reversal."""
+        return self.printer_style_combo.currentText() == "Face-down (most printers)"
+
+    def _manual_duplex_reload_instructions(self) -> str:
+        style = self.printer_style_combo.currentText()
+        if style == "Face-up / straight-through":
+            return (
+                "Remove the printed stack from the output tray.\n\n"
+                "Flip the entire stack face-down (printed side facing down), "
+                "reversing the top-to-bottom order, then place it in the input "
+                "tray with the top edge of the pages going in first.\n\n"
+                "Click OK to print the back sides, or Cancel to stop here."
+            )
+        # Default: face-down output tray (most laser printers and inkjets)
+        return (
+            "Remove the printed stack from the output tray.\n\n"
+            "Place it back in the input tray in the same orientation — "
+            "printed side down, top edge of the pages going in first. "
+            "Do not flip or reorder the sheets.\n\n"
+            "Click OK to print the back sides, or Cancel to stop here."
+        )
 
     def _on_copies_changed(self, value: int):
         self.collate_check.setEnabled(value > 1)
@@ -1050,7 +1082,7 @@ class BatchPrintApp(QMainWindow):
                     back_path = None
                     try:
                         front_path, back_path = split_for_manual_duplex(
-                            tmp, self.reverse_back_check.isChecked()
+                            tmp, self._manual_duplex_reverse_back()
                         )
                         print_pdf_qt(
                             front_path, printer_name,
@@ -1064,8 +1096,7 @@ class BatchPrintApp(QMainWindow):
                                 self,
                                 "Manual Duplex — Reload Paper",
                                 "Front sides have been sent to the printer.\n\n"
-                                "Once printing is complete, reload the pages into "
-                                "the paper tray and click OK to print the back sides.",
+                                + self._manual_duplex_reload_instructions(),
                                 QMessageBox.StandardButton.Ok
                                 | QMessageBox.StandardButton.Cancel,
                             )
@@ -1164,7 +1195,7 @@ class BatchPrintApp(QMainWindow):
                 "bleed_marks": self.bleed_marks_check.isChecked(),
                 "duplex": self.duplex_check.isChecked(),
                 "manual_duplex": self.manual_duplex_check.isChecked(),
-                "reverse_back": self.reverse_back_check.isChecked(),
+                "printer_style": self.printer_style_combo.currentText(),
                 "auto_rotate": self.auto_rotate_check.isChecked(),
                 "auto_center": self.auto_center_check.isChecked(),
                 "orientation": self.orientation_combo.currentText(),

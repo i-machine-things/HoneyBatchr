@@ -13,7 +13,7 @@ DEFAULT_CONFIG: dict = {
     "bleed_marks": False,
     "duplex": False,
     "manual_duplex": False,
-    "reverse_back": True,
+    "printer_style": "Face-down (most printers)",
     "auto_rotate": True,
     "auto_center": True,
     "orientation": "Portrait",
