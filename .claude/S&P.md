@@ -140,3 +140,20 @@ Review this file before making changes to the codebase.
 2. **UI label strings used as config persistence keys**
    - `printer_style` was saved and compared using the rendered display label (e.g. `"Face-down (most printers)"`); any copy-edit or future localisation would silently break saved preferences and branching logic
    - Fix: introduce `_PRINTER_STYLE_KEYS` (`face_down`/`face_up` → label) and `_PRINTER_STYLE_LABELS` (reverse map) at module level; persist and compare stable keys only; use maps when populating and reading the combo
+
+---
+
+## 2026-04-12 — `build_scripts/HoneyBatchr.iss` + `README.md` (PR #11 — feat/windows-installer)
+
+**Review:** CodeRabbit review of Inno Setup installer — 2 findings.
+**Result:** Both fixed.
+
+### Findings
+
+1. **`OutputDir` relative path resolved to wrong directory**
+   - `OutputDir=installer_out` in `build_scripts/HoneyBatchr.iss` resolves relative to the script's own directory, emitting to `build_scripts/installer_out`; the CI workflow expected the artifact at repo-root `installer_out/`
+   - Fix: change to `OutputDir=..\installer_out` to resolve correctly from the repo root
+
+2. **Windows build snippet used wrong shell dialect label**
+   - README code fence was labeled `bash` but contained Windows `set RELEASE_VERSION=dev` syntax
+   - Fix: change fence label to `powershell` and use `$env:RELEASE_VERSION = "dev"`
