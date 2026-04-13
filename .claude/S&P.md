@@ -123,3 +123,20 @@ Review this file before making changes to the codebase.
 2. **README Linux build steps missing Flatpak prerequisites**
    - The documented manual build commands assumed Flathub remote and runtime/SDK were already installed; would fail on a clean system
    - Fix: prepend `flatpak remote-add` and `flatpak install` steps to the README Linux build section; also added `--runtime-repo` to the documented `flatpak build-bundle` command
+
+---
+
+## 2026-04-12 — `modules/config.py` + `modules/app.py` (PR #10 — feat/duplex-reload-instructions)
+
+**Review:** CodeRabbit review of printer-style selector and duplex reload instructions — 2 findings.
+**Result:** Both fixed.
+
+### Findings
+
+1. **Legacy `reverse_back` config not migrated to `printer_style`**
+   - `load_config()` adopted the new `printer_style` key but never mapped older configs that only contain `reverse_back: false`; those users would silently revert to the face-down default on next launch, losing their preference
+   - Fix: in `load_config()`, detect presence of `reverse_back` with absence of `printer_style` and map it: `True → "face_down"`, `False → "face_up"`
+
+2. **UI label strings used as config persistence keys**
+   - `printer_style` was saved and compared using the rendered display label (e.g. `"Face-down (most printers)"`); any copy-edit or future localisation would silently break saved preferences and branching logic
+   - Fix: introduce `_PRINTER_STYLE_KEYS` (`face_down`/`face_up` → label) and `_PRINTER_STYLE_LABELS` (reverse map) at module level; persist and compare stable keys only; use maps when populating and reading the combo
