@@ -65,9 +65,9 @@ python main.py "C:\docs\file1.pdf" "C:\docs\file2.pdf"
 ## Building
 
 **Windows:**
-```bash
+```powershell
 python -m PyInstaller build_scripts/HoneyBatchr.spec --clean --noconfirm
-set RELEASE_VERSION=dev
+$env:RELEASE_VERSION = "dev"
 iscc build_scripts\HoneyBatchr.iss
 ```
 Produces `installer_out\HoneyBatchr-dev-windows-setup.exe` via PyInstaller + Inno Setup.
