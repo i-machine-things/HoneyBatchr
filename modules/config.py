@@ -13,7 +13,7 @@ DEFAULT_CONFIG: dict = {
     "bleed_marks": False,
     "duplex": False,
     "manual_duplex": False,
-    "printer_style": "Face-down (most printers)",
+    "printer_style": "face_down",
     "auto_rotate": True,
     "auto_center": True,
     "orientation": "Portrait",
@@ -40,7 +40,13 @@ def load_config() -> dict:
     try:
         if CONFIG_FILE.exists():
             with open(CONFIG_FILE, encoding="utf-8") as f:
-                result.update(json.load(f))
+                saved = json.load(f)
+            # Migrate legacy reverse_back boolean to the printer_style stable key.
+            if "printer_style" not in saved and "reverse_back" in saved:
+                saved["printer_style"] = (
+                    "face_down" if saved["reverse_back"] else "face_up"
+                )
+            result.update(saved)
     except Exception as e:
         print(f"Error loading config: {e}")
     return result

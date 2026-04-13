@@ -264,6 +264,16 @@ class PageSettingDialog(QDialog):
         }
 
 
+# Stable config keys → display labels for the printer style combo.
+# Add new styles here; never rename existing keys (that would break saved configs).
+_PRINTER_STYLE_KEYS: dict[str, str] = {
+    "face_down": "Face-down (most printers)",
+    "face_up":   "Face-up / straight-through",
+}
+# Reverse map: label → key (used when reading the combo selection)
+_PRINTER_STYLE_LABELS: dict[str, str] = {v: k for k, v in _PRINTER_STYLE_KEYS.items()}
+
+
 class BatchPrintApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -635,12 +645,12 @@ class BatchPrintApp(QMainWindow):
         self._printer_style_label = QLabel("Printer output:")
         md_layout.addWidget(self._printer_style_label)
         self.printer_style_combo = QComboBox()
-        self.printer_style_combo.addItems([
-            "Face-down (most printers)",
-            "Face-up / straight-through",
-        ])
-        saved_style = self.config.get("printer_style", "Face-down (most printers)")
-        idx = self.printer_style_combo.findText(saved_style)
+        self.printer_style_combo.addItems(
+            [label for label in _PRINTER_STYLE_LABELS]
+        )
+        saved_key = self.config.get("printer_style", "face_down")
+        saved_label = _PRINTER_STYLE_KEYS.get(saved_key, _PRINTER_STYLE_KEYS["face_down"])
+        idx = self.printer_style_combo.findText(saved_label)
         self.printer_style_combo.setCurrentIndex(idx if idx >= 0 else 0)
         md_layout.addWidget(self.printer_style_combo)
         layout.addWidget(md_indent)
@@ -771,13 +781,16 @@ class BatchPrintApp(QMainWindow):
         if checked and self.duplex_check.isChecked():
             self.duplex_check.setChecked(False)
 
+    def _printer_style_key(self) -> str:
+        return _PRINTER_STYLE_LABELS.get(self.printer_style_combo.currentText(), "face_down")
+
     def _manual_duplex_reverse_back(self) -> bool:
         """Return True when the selected printer style requires back-page reversal."""
-        return self.printer_style_combo.currentText() == "Face-down (most printers)"
+        return self._printer_style_key() == "face_down"
 
     def _manual_duplex_reload_instructions(self) -> str:
-        style = self.printer_style_combo.currentText()
-        if style == "Face-up / straight-through":
+        style = self._printer_style_key()
+        if style == "face_up":
             return (
                 "Remove the printed stack from the output tray.\n\n"
                 "Flip the entire stack face-down (printed side facing down), "
@@ -1195,7 +1208,7 @@ class BatchPrintApp(QMainWindow):
                 "bleed_marks": self.bleed_marks_check.isChecked(),
                 "duplex": self.duplex_check.isChecked(),
                 "manual_duplex": self.manual_duplex_check.isChecked(),
-                "printer_style": self.printer_style_combo.currentText(),
+                "printer_style": self._printer_style_key(),
                 "auto_rotate": self.auto_rotate_check.isChecked(),
                 "auto_center": self.auto_center_check.isChecked(),
                 "orientation": self.orientation_combo.currentText(),
