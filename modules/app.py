@@ -1072,8 +1072,8 @@ class BatchPrintApp(QMainWindow):
                 margin_pts = self.margins_spin.value() * 72 if self.margins_check.isChecked() else 0.0
                 draw_border = self.print_page_border_check.isChecked() and nup > 1
 
-                tmp = compose_nup_pdf(
-                    fitz_entries, nup, order, margin_pts, draw_border,
+                compose_kwargs = dict(
+                    nup=nup, order=order, margin_pts=margin_pts, draw_border=draw_border,
                     orientation=self.config.get("page_setting_orientation", "Portrait"),
                     auto_rotate=self.auto_rotate_check.isChecked(),
                     auto_center=self.auto_center_check.isChecked(),
@@ -1091,6 +1091,7 @@ class BatchPrintApp(QMainWindow):
                             "rendered by Honey Batchr. Remove unsupported files "
                             "from the queue or turn off manual duplex."
                         )
+                    tmp = compose_nup_pdf(fitz_entries, **compose_kwargs)
                     front_path = None
                     back_path = None
                     try:
@@ -1131,21 +1132,43 @@ class BatchPrintApp(QMainWindow):
                                 except OSError:
                                     pass
                 else:
+                    global_duplex = self.duplex_check.isChecked()
+                    global_flip_long = self.flip_long_radio.isChecked()
+
+                    def _eff(e: dict) -> tuple[bool, bool]:
+                        ov = e.get("duplex_override")
+                        if ov is None:
+                            return (global_duplex, global_flip_long)
+                        if not ov:
+                            return (False, True)
+                        return (True, not e.get("flip_short_edge", False))
+
+                    groups: list[tuple[list, bool, bool]] = []
+                    for _e in fitz_entries:
+                        _d, _fl = _eff(_e)
+                        if groups and groups[-1][1] == _d and groups[-1][2] == _fl:
+                            groups[-1][0].append(_e)
+                        else:
+                            groups.append(([_e], _d, _fl))
+
+                    all_tmps: list[str] = []
                     try:
-                        print_pdf_qt(
-                            tmp,
-                            printer_name,
-                            copies=self.copies_spin.value(),
-                            grayscale=self.grayscale_check.isChecked(),
-                            duplex=self.duplex_check.isChecked(),
-                            flip_long=self.flip_long_radio.isChecked(),
-                            paper_size=self.config.get("paper_size", "Letter"),
-                        )
+                        for group_entries, _d, _fl in groups:
+                            g_tmp = compose_nup_pdf(group_entries, **compose_kwargs)
+                            all_tmps.append(g_tmp)
+                            print_pdf_qt(
+                                g_tmp, printer_name,
+                                copies=self.copies_spin.value(),
+                                grayscale=self.grayscale_check.isChecked(),
+                                duplex=_d, flip_long=_fl,
+                                paper_size=self.config.get("paper_size", "Letter"),
+                            )
                     finally:
-                        try:
-                            os.unlink(tmp)
-                        except OSError:
-                            pass
+                        for p in all_tmps:
+                            try:
+                                os.unlink(p)
+                            except OSError:
+                                pass
             except Exception as e:
                 errors.append(f"Rendered print failed: {e}")
 

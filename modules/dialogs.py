@@ -254,27 +254,27 @@ class PageConfigDialog(QDialog):
         sg_lay.addLayout(copies_row)
 
         method_row = QHBoxLayout()
-        method_row.addWidget(QLabel("Method:"))
-        self._duplex_chk = QCheckBox("Print on both sides of paper")
-        self._duplex_chk.setChecked(self.entry.get("duplex_override", False))
-        self._duplex_chk.toggled.connect(self._toggle_flip)
-        method_row.addWidget(self._duplex_chk)
+        method_row.addWidget(QLabel("Duplex:"))
+        self._duplex_combo = QComboBox()
+        self._duplex_combo.addItems([
+            "Use global setting",
+            "Single sided",
+            "Double sided \u2014 long edge",
+            "Double sided \u2014 short edge",
+        ])
+        override = self.entry.get("duplex_override")
+        if override is True:
+            sel = ("Double sided \u2014 short edge"
+                   if self.entry.get("flip_short_edge") else "Double sided \u2014 long edge")
+        elif override is False:
+            sel = "Single sided"
+        else:
+            sel = "Use global setting"
+        idx = self._duplex_combo.findText(sel)
+        self._duplex_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        method_row.addWidget(self._duplex_combo)
         method_row.addStretch()
         sg_lay.addLayout(method_row)
-
-        flip_w = QWidget()
-        fi = QVBoxLayout(flip_w)
-        fi.setContentsMargins(60, 0, 0, 0)
-        fi.setSpacing(2)
-        self._flip_long = QRadioButton("Flip on long edge")
-        flip_short_saved = self.entry.get("flip_short_edge", False)
-        self._flip_long.setChecked(not flip_short_saved)
-        self._flip_short = QRadioButton("Flip on short edge")
-        self._flip_short.setChecked(flip_short_saved)
-        fi.addWidget(self._flip_long)
-        fi.addWidget(self._flip_short)
-        sg_lay.addWidget(flip_w)
-        self._toggle_flip(self._duplex_chk.isChecked())
 
         self._reverse_chk = QCheckBox("Reverse pages")
         self._reverse_chk.setChecked(self.entry.get("reverse_pages", False))
@@ -304,10 +304,6 @@ class PageConfigDialog(QDialog):
         return col
 
     # ── Preview rendering ──────────────────────────────────────────────────────
-
-    def _toggle_flip(self, checked: bool):
-        self._flip_long.setEnabled(checked)
-        self._flip_short.setEnabled(checked)
 
     def _render_current_sheet(self):
         cw = self._canvas.width() - 4
@@ -445,9 +441,20 @@ class PageConfigDialog(QDialog):
                 from PyQt6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, "Invalid Range", "Please enter a page range.")
                 return
+        sel = self._duplex_combo.currentText()
+        if sel == "Single sided":
+            self.entry["duplex_override"] = False
+            self.entry["flip_short_edge"] = False
+        elif sel == "Double sided \u2014 long edge":
+            self.entry["duplex_override"] = True
+            self.entry["flip_short_edge"] = False
+        elif sel == "Double sided \u2014 short edge":
+            self.entry["duplex_override"] = True
+            self.entry["flip_short_edge"] = True
+        else:  # "Use global setting"
+            self.entry["duplex_override"] = None
+            self.entry["flip_short_edge"] = False
         self.entry["copies_override"] = self._copies_spin.value()
-        self.entry["duplex_override"] = self._duplex_chk.isChecked()
-        self.entry["flip_short_edge"] = self._flip_short.isChecked()
         self.entry["reverse_pages"] = self._reverse_chk.isChecked()
         self.entry["print_range"] = (
             self._pages_edit.text().strip() if self._r_pages.isChecked() else "All"
