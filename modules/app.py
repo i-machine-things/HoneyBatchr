@@ -14,10 +14,11 @@ from PyQt6.QtWidgets import (
     QRadioButton, QGroupBox, QTabWidget, QHeaderView, QStyleFactory,
     QApplication, QDialog,
 )
-from PyQt6.QtCore import Qt, QItemSelectionModel, QRectF
+from PyQt6.QtCore import Qt, QItemSelectionModel, QRectF, QTimer
 from PyQt6.QtGui import QIcon, QAction, QActionGroup, QPainter, QPen, QColor, QFont
 
 from modules.config import CONFIG_FILE, load_config, write_config, update_config_value
+from modules.updater import UpdateChecker, UpdateDialog, APP_VERSION
 from modules.utils import FITZ_EXTS, pdf_page_count
 from modules.themes import light_palette, dark_palette, STYLESHEET
 from modules.widgets import DroppableTable
@@ -289,6 +290,7 @@ class BatchPrintApp(QMainWindow):
         self._theme_actions: List[QAction] = []
         self.config = load_config()
         self.init_ui()
+        QTimer.singleShot(3000, self._start_auto_update_check)
 
     # ── UI construction ────────────────────────────────────────────────────────
 
@@ -763,6 +765,10 @@ class BatchPrintApp(QMainWindow):
 
         help_menu = menubar.addMenu("Help")
         if help_menu:
+            update_act = QAction("Check for Updates", self)
+            update_act.triggered.connect(self.check_for_updates)
+            help_menu.addAction(update_act)
+            help_menu.addSeparator()
             about_act = QAction("About Honey Batchr", self)
             about_act.triggered.connect(self._show_about)
             help_menu.addAction(about_act)
@@ -830,7 +836,38 @@ class BatchPrintApp(QMainWindow):
         self.remove_btn.setEnabled(has_sel)
 
     def _show_about(self):
-        QMessageBox.information(self, "About", "Honey Batchr\nBatch printing made simple.")
+        QMessageBox.information(
+            self, "About",
+            f"Honey Batchr\nBatch printing made simple.\n\nVersion: {APP_VERSION}",
+        )
+
+    # ── Update checking ────────────────────────────────────────────────────────
+
+    def _start_auto_update_check(self) -> None:
+        cfg = load_config()
+        if cfg.get('updates_notifications_disabled'):
+            return
+        checker = UpdateChecker(self)
+        checker.update_available.connect(self._on_update_available)
+        checker.finished.connect(checker.deleteLater)
+        checker.start()
+
+    def check_for_updates(self) -> None:
+        """Manual update check triggered from the Help menu."""
+        checker = UpdateChecker(self)
+        checker.update_available.connect(self._on_update_available)
+        checker.up_to_date.connect(
+            lambda: QMessageBox.information(self, "Up to Date", "Honey Batchr is up to date.")
+        )
+        checker.finished.connect(checker.deleteLater)
+        checker.start()
+
+    def _on_update_available(self, tag: str, html_url: str, asset_url: str) -> None:
+        cfg = load_config()
+        if cfg.get('updates_skipped_version') == tag:
+            return
+        dlg = UpdateDialog(tag, html_url, asset_url, self)
+        dlg.exec()
 
     # ── Theme ──────────────────────────────────────────────────────────────────
 

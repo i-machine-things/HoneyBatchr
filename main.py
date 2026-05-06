@@ -10,7 +10,10 @@ from PyQt6.QtWidgets import QApplication, QStyleFactory
 
 from modules.config import CONFIG_FILE
 from modules.themes import light_palette, dark_palette, STYLESHEET
+from modules.updater import flatpak_dns_fix
 from modules.app import BatchPrintApp
+
+flatpak_dns_fix()
 
 
 def main():
