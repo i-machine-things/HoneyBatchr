@@ -186,3 +186,20 @@ Review this file before making changes to the codebase.
 5. **PE/MZ header check insufficient for installer authenticity (pending)**
    - Format check confirms the file is a Windows executable but does not verify cryptographic integrity or origin
    - Status: logged for future investigation — requires determining whether releases use Authenticode signing or a published SHA-256 digest
+
+---
+
+## 2026-05-08 — `modules/updater.py` + `modules/app.py` (PR #13 second review — feat/update-checker)
+
+**Review:** CodeRabbit follow-up review of fix commit — 2 new findings.
+**Result:** Both fixed.
+
+### Findings
+
+1. **`UpdateChecker.run()` silently swallows all network/JSON errors**
+   - Broad `except ... pass` meant the UI never learned of failures; manual "Check for Updates" would just do nothing on network error
+   - Fix: add `check_failed = pyqtSignal(str)` to `UpdateChecker`; emit it with `str(exc)` instead of `pass`; connect it in `check_for_updates()` (manual path only) to show a `QMessageBox.warning`
+
+2. **`UpdateDownloader.finished` shadows `QThread`'s built-in `finished()` signal**
+   - `QThread` emits a parameterless `finished()` when `run()` returns; declaring `finished = pyqtSignal(str)` at the Python level shadows it, causing `thread.finished.connect(worker.deleteLater)` to connect to the wrong overload
+   - Fix: rename signal to `download_finished`; update `self.finished.emit(...)`, `downloader.finished.connect(_on_done)`, and `downloader.finished.connect(downloader.deleteLater)` to use the new name

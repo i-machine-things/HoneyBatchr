@@ -54,6 +54,7 @@ class UpdateChecker(QThread):
     """Queries the GitHub releases API on a background thread."""
     update_available = pyqtSignal(str, str, str)  # (tag, html_url, asset_url)
     up_to_date = pyqtSignal()
+    check_failed = pyqtSignal(str)
 
     def run(self):
         try:
@@ -75,14 +76,14 @@ class UpdateChecker(QThread):
                 self.update_available.emit(tag, html_url, asset_url)
             else:
                 self.up_to_date.emit()
-        except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError):
-            pass
+        except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError) as exc:
+            self.check_failed.emit(str(exc))
 
 
 class UpdateDownloader(QThread):
     """Downloads a release asset to a temp file on a background thread."""
     progress = pyqtSignal(int, int)  # (bytes_done, total_bytes)
-    finished = pyqtSignal(str)       # dest_path on success
+    download_finished = pyqtSignal(str)  # dest_path on success
     cancelled = pyqtSignal()
     error = pyqtSignal(str)
 
@@ -129,7 +130,7 @@ class UpdateDownloader(QThread):
                     pass
                 self.error.emit(f"Download truncated: received {done} of {total} bytes")
                 return
-            self.finished.emit(self._dest_path)
+            self.download_finished.emit(self._dest_path)
         except Exception as exc:
             try:
                 os.remove(self._dest_path)
@@ -262,10 +263,10 @@ class UpdateDialog(QDialog):
             self.accept()
 
         downloader.progress.connect(_on_progress)
-        downloader.finished.connect(_on_done)
+        downloader.download_finished.connect(_on_done)
         downloader.cancelled.connect(_on_cancelled)
         downloader.error.connect(_on_error)
-        downloader.finished.connect(downloader.deleteLater)
+        downloader.download_finished.connect(downloader.deleteLater)
         downloader.cancelled.connect(downloader.deleteLater)
         downloader.error.connect(downloader.deleteLater)
         downloader.start()

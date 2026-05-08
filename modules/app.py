@@ -859,6 +859,10 @@ class BatchPrintApp(QMainWindow):
         checker.up_to_date.connect(
             lambda: QMessageBox.information(self, "Up to Date", "Honey Batchr is up to date.")
         )
+        checker.check_failed.connect(
+            lambda msg: QMessageBox.warning(self, "Update Check Failed",
+                                            f"Could not check for updates:\n{msg}")
+        )
         checker.finished.connect(checker.deleteLater)
         checker.start()
 
