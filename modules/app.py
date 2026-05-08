@@ -855,7 +855,7 @@ class BatchPrintApp(QMainWindow):
     def check_for_updates(self) -> None:
         """Manual update check triggered from the Help menu."""
         checker = UpdateChecker(self)
-        checker.update_available.connect(self._on_update_available)
+        checker.update_available.connect(self._on_update_available_manual)
         checker.up_to_date.connect(
             lambda: QMessageBox.information(self, "Up to Date", "Honey Batchr is up to date.")
         )
@@ -866,6 +866,10 @@ class BatchPrintApp(QMainWindow):
         cfg = load_config()
         if cfg.get('updates_skipped_version') == tag:
             return
+        dlg = UpdateDialog(tag, html_url, asset_url, self)
+        dlg.exec()
+
+    def _on_update_available_manual(self, tag: str, html_url: str, asset_url: str) -> None:
         dlg = UpdateDialog(tag, html_url, asset_url, self)
         dlg.exec()
 

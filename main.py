@@ -13,10 +13,8 @@ from modules.themes import light_palette, dark_palette, STYLESHEET
 from modules.updater import flatpak_dns_fix
 from modules.app import BatchPrintApp
 
-flatpak_dns_fix()
-
-
 def main():
+    flatpak_dns_fix()
     app = QApplication(sys.argv)
 
     # Apply saved theme before the window is constructed so it renders correctly

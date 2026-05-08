@@ -288,9 +288,9 @@ def flatpak_dns_fix() -> None:
     if not os.getenv('FLATPAK_ID'):
         return
     import re
+    import secrets
     import socket
     import struct
-    import random
 
     try:
         socket.getaddrinfo('github.com', 443, socket.AF_INET)
@@ -322,7 +322,7 @@ def flatpak_dns_fix() -> None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.settimeout(3)
         try:
-            qid = random.randint(0, 65535)
+            qid = secrets.randbelow(65536)
             labels = b''.join(bytes([len(p)]) + p.encode()
                               for p in host.rstrip('.').split('.')) + b'\x00'
             pkt = (struct.pack('!HHHHHH', qid, 0x0100, 1, 0, 0, 0)
@@ -331,6 +331,8 @@ def flatpak_dns_fix() -> None:
             resp = sock.recv(512)
         finally:
             sock.close()
+        if len(resp) < 12 or struct.unpack('!H', resp[:2])[0] != qid:
+            return []
         ancount = struct.unpack('!H', resp[6:8])[0]
         pos = 12
         while resp[pos]:
@@ -356,9 +358,9 @@ def flatpak_dns_fix() -> None:
     _orig_getaddrinfo = socket.getaddrinfo
     _ns_list = nameservers[:]
 
-    def _getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    def _getaddrinfo(host, port, family=0, socktype=0, proto=0, flags=0):
         try:
-            return _orig_getaddrinfo(host, port, family, type, proto, flags)
+            return _orig_getaddrinfo(host, port, family, socktype, proto, flags)
         except (socket.gaierror, OSError):
             pass
         p = port if isinstance(port, int) else 0
@@ -369,6 +371,6 @@ def flatpak_dns_fix() -> None:
                             (socket.AF_INET, socket.SOCK_DGRAM, 17, '', (_ip, p))]
             except Exception:
                 continue
-        return _orig_getaddrinfo(host, port, family, type, proto, flags)
+        return _orig_getaddrinfo(host, port, family, socktype, proto, flags)
 
     socket.getaddrinfo = _getaddrinfo

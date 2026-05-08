@@ -157,3 +157,32 @@ Review this file before making changes to the codebase.
 2. **Windows build snippet used wrong shell dialect label**
    - README code fence was labeled `bash` but contained Windows `set RELEASE_VERSION=dev` syntax
    - Fix: change fence label to `powershell` and use `$env:RELEASE_VERSION = "dev"`
+
+---
+
+## 2026-05-08 — `main.py` + `modules/updater.py` + `modules/app.py` (PR #13 — feat/update-checker)
+
+**Review:** CodeRabbit review of in-app update checker — 3 actionable + 2 nitpicks.
+**Result:** All 5 fixed.
+
+### Findings
+
+1. **`flatpak_dns_fix()` called at module top level**
+   - Side effect on any import of `main` (tests, packaging tools); should only run when app starts
+   - Fix: move call inside `main()`, before `QApplication(sys.argv)`
+
+2. **`random.randint` used for DNS query ID — not cryptographically unpredictable**
+   - Predictable QID allows DNS spoofing; response QID was also never validated
+   - Fix: replace with `secrets.randbelow(65536)`; validate response length ≥ 12 bytes and QID match before parsing
+
+3. **`_getaddrinfo` wrapper parameter named `type` shadows builtin**
+   - Fragile inside function body; Ruff A002 flag
+   - Fix: rename parameter to `socktype` in signature and all call sites
+
+4. **Manual "Check for Updates" blocked by `updates_skipped_version` filter**
+   - `check_for_updates()` connected to `_on_update_available` which silently returns for skipped versions; user-initiated checks should always show the dialog
+   - Fix: add `_on_update_available_manual` that skips the version filter; wire manual checker to it
+
+5. **PE/MZ header check insufficient for installer authenticity (pending)**
+   - Format check confirms the file is a Windows executable but does not verify cryptographic integrity or origin
+   - Status: logged for future investigation — requires determining whether releases use Authenticode signing or a published SHA-256 digest
