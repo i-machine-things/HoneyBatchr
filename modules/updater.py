@@ -1,11 +1,14 @@
 """Background update checker, downloader, and update dialog for HoneyBatchr."""
 
+import html
 import json
 import os
+import platform
 import subprocess
 import tempfile
 import urllib.error
 import urllib.request
+import webbrowser
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
@@ -87,8 +90,8 @@ class UpdateDownloader(QThread):
     cancelled = pyqtSignal()
     error = pyqtSignal(str)
 
-    def __init__(self, asset_url: str, dest_path: str):
-        super().__init__()
+    def __init__(self, asset_url: str, dest_path: str, parent=None):
+        super().__init__(parent)
         self._asset_url = asset_url
         self._dest_path = dest_path
 
@@ -150,14 +153,12 @@ class UpdateDialog(QDialog):
         self._release_url = release_url
         self._asset_url = asset_url
 
-        import platform as _platform
-        self._is_flatpak = _platform.system() == 'Linux' and bool(os.getenv('FLATPAK_ID'))
-        self._can_download = _platform.system() == 'Windows' and bool(asset_url)
+        self._is_flatpak = platform.system() == 'Linux' and bool(os.getenv('FLATPAK_ID'))
+        self._can_download = platform.system() == 'Windows' and bool(asset_url)
 
         layout = QVBoxLayout(self)
 
-        import html as _html
-        label = QLabel(f"<b>{_html.escape(latest_version)}</b> is available. Upgrade now?")
+        label = QLabel(f"<b>{html.escape(latest_version)}</b> is available. Upgrade now?")
         label.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(label)
 
@@ -181,7 +182,6 @@ class UpdateDialog(QDialog):
         if self._can_download:
             self._start_download()
         else:
-            import webbrowser
             webbrowser.open(self._release_url)
             self.accept()
 
@@ -198,7 +198,7 @@ class UpdateDialog(QDialog):
         progress_dlg.setMinimumDuration(0)
         progress_dlg.setValue(0)
 
-        downloader = UpdateDownloader(self._asset_url, dest)
+        downloader = UpdateDownloader(self._asset_url, dest, self)
         self._downloader = downloader
         progress_dlg.canceled.connect(downloader.requestInterruption)
 
@@ -226,7 +226,6 @@ class UpdateDialog(QDialog):
                     os.remove(path)
                 except OSError:
                     pass
-                import webbrowser
                 webbrowser.open(self._release_url)
                 self.accept()
                 return
@@ -258,7 +257,6 @@ class UpdateDialog(QDialog):
                 self, "Download Failed",
                 f"Could not download the update:\n{msg}\n\nOpening the releases page instead.",
             )
-            import webbrowser
             webbrowser.open(self._release_url)
             self.accept()
 
@@ -336,8 +334,10 @@ def flatpak_dns_fix() -> None:
             return []
         ancount = struct.unpack('!H', resp[6:8])[0]
         pos = 12
-        while resp[pos]:
+        while pos < len(resp) and resp[pos]:
             pos += resp[pos] + 1
+        if pos + 5 > len(resp):
+            return []
         pos += 5
         ips: list = []
         for _ in range(ancount):
