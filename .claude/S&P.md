@@ -157,3 +157,20 @@ Review this file before making changes to the codebase.
 2. **Windows build snippet used wrong shell dialect label**
    - README code fence was labeled `bash` but contained Windows `set RELEASE_VERSION=dev` syntax
    - Fix: change fence label to `powershell` and use `$env:RELEASE_VERSION = "dev"`
+
+---
+
+## 2026-05-09 — `.github/workflows/code-audit.yml` + `coderabbit-rate-limit.yml` (PR #14 — ci/quality-control-hub)
+
+**Review:** CodeRabbit review of quality control hub workflows — 2 actionable findings.
+**Result:** Both fixed.
+
+### Findings
+
+1. **`|| true` masks tool execution failures in audit workflow**
+   - Appending `|| true` to flake8 and bandit runs causes the job to report success even when the tools crash (bad config, missing dependency, disk error); real failures are indistinguishable from clean runs
+   - Fix: replace `|| true` with `--exit-zero` on both tools — findings pass the step while execution errors still fail the job
+
+2. **`timeout-minutes: 90` too short for worst-case rate-limit wait**
+   - A 1-hour CR rate limit + 60 s buffer + step overhead can exceed 90 min, causing the job to time out before posting `@coderabbitai resume/review`
+   - Fix: increase to `timeout-minutes: 180`

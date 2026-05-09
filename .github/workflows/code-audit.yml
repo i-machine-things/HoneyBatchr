@@ -33,14 +33,16 @@ jobs:
             --max-line-length=120 \
             --select=E,F \
             --exclude=.git,__pycache__,build,build_scripts,dist,resources \
-            . > flake8_results.txt 2>&1 || true
+            --exit-zero \
+            . > flake8_results.txt 2>&1
 
       - name: Run bandit (medium/high severity only)
         run: |
           bandit -r . \
             --exclude ./.git,./build,./build_scripts,./dist,./resources \
             --severity-level medium \
-            -f json -o bandit_results.json -q || true
+            --exit-zero \
+            -f json -o bandit_results.json -q
 
       - name: Post findings as GitHub issues
         env:
