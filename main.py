@@ -10,10 +10,11 @@ from PyQt6.QtWidgets import QApplication, QStyleFactory
 
 from modules.config import CONFIG_FILE
 from modules.themes import light_palette, dark_palette, STYLESHEET
+from modules.updater import flatpak_dns_fix
 from modules.app import BatchPrintApp
 
-
 def main():
+    flatpak_dns_fix()
     app = QApplication(sys.argv)
 
     # Apply saved theme before the window is constructed so it renders correctly

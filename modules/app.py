@@ -14,10 +14,11 @@ from PyQt6.QtWidgets import (
     QRadioButton, QGroupBox, QTabWidget, QHeaderView, QStyleFactory,
     QApplication, QDialog,
 )
-from PyQt6.QtCore import Qt, QItemSelectionModel, QRectF
+from PyQt6.QtCore import Qt, QItemSelectionModel, QRectF, QTimer
 from PyQt6.QtGui import QIcon, QAction, QActionGroup, QPainter, QPen, QColor, QFont
 
 from modules.config import CONFIG_FILE, load_config, write_config, update_config_value
+from modules.updater import UpdateChecker, UpdateDialog, APP_VERSION
 from modules.utils import FITZ_EXTS, pdf_page_count
 from modules.themes import light_palette, dark_palette, STYLESHEET
 from modules.widgets import DroppableTable
@@ -289,6 +290,7 @@ class BatchPrintApp(QMainWindow):
         self._theme_actions: List[QAction] = []
         self.config = load_config()
         self.init_ui()
+        QTimer.singleShot(3000, self._start_auto_update_check)
 
     # ── UI construction ────────────────────────────────────────────────────────
 
@@ -763,6 +765,10 @@ class BatchPrintApp(QMainWindow):
 
         help_menu = menubar.addMenu("Help")
         if help_menu:
+            update_act = QAction("Check for Updates", self)
+            update_act.triggered.connect(self.check_for_updates)
+            help_menu.addAction(update_act)
+            help_menu.addSeparator()
             about_act = QAction("About Honey Batchr", self)
             about_act.triggered.connect(self._show_about)
             help_menu.addAction(about_act)
@@ -830,7 +836,46 @@ class BatchPrintApp(QMainWindow):
         self.remove_btn.setEnabled(has_sel)
 
     def _show_about(self):
-        QMessageBox.information(self, "About", "Honey Batchr\nBatch printing made simple.")
+        QMessageBox.information(
+            self, "About",
+            f"Honey Batchr\nBatch printing made simple.\n\nVersion: {APP_VERSION}",
+        )
+
+    # ── Update checking ────────────────────────────────────────────────────────
+
+    def _start_auto_update_check(self) -> None:
+        cfg = load_config()
+        if cfg.get('updates_notifications_disabled'):
+            return
+        checker = UpdateChecker(self)
+        checker.update_available.connect(self._on_update_available)
+        checker.finished.connect(checker.deleteLater)
+        checker.start()
+
+    def check_for_updates(self) -> None:
+        """Manual update check triggered from the Help menu."""
+        checker = UpdateChecker(self)
+        checker.update_available.connect(self._on_update_available_manual)
+        checker.up_to_date.connect(
+            lambda: QMessageBox.information(self, "Up to Date", "Honey Batchr is up to date.")
+        )
+        checker.check_failed.connect(
+            lambda msg: QMessageBox.warning(self, "Update Check Failed",
+                                            f"Could not check for updates:\n{msg}")
+        )
+        checker.finished.connect(checker.deleteLater)
+        checker.start()
+
+    def _on_update_available(self, tag: str, html_url: str, asset_url: str) -> None:
+        cfg = load_config()
+        if cfg.get('updates_skipped_version') == tag:
+            return
+        dlg = UpdateDialog(tag, html_url, asset_url, self)
+        dlg.exec()
+
+    def _on_update_available_manual(self, tag: str, html_url: str, asset_url: str) -> None:
+        dlg = UpdateDialog(tag, html_url, asset_url, self)
+        dlg.exec()
 
     # ── Theme ──────────────────────────────────────────────────────────────────
 
@@ -1072,8 +1117,8 @@ class BatchPrintApp(QMainWindow):
                 margin_pts = self.margins_spin.value() * 72 if self.margins_check.isChecked() else 0.0
                 draw_border = self.print_page_border_check.isChecked() and nup > 1
 
-                tmp = compose_nup_pdf(
-                    fitz_entries, nup, order, margin_pts, draw_border,
+                compose_kwargs = dict(
+                    nup=nup, order=order, margin_pts=margin_pts, draw_border=draw_border,
                     orientation=self.config.get("page_setting_orientation", "Portrait"),
                     auto_rotate=self.auto_rotate_check.isChecked(),
                     auto_center=self.auto_center_check.isChecked(),
@@ -1091,6 +1136,7 @@ class BatchPrintApp(QMainWindow):
                             "rendered by Honey Batchr. Remove unsupported files "
                             "from the queue or turn off manual duplex."
                         )
+                    tmp = compose_nup_pdf(fitz_entries, **compose_kwargs)
                     front_path = None
                     back_path = None
                     try:
@@ -1131,21 +1177,43 @@ class BatchPrintApp(QMainWindow):
                                 except OSError:
                                     pass
                 else:
+                    global_duplex = self.duplex_check.isChecked()
+                    global_flip_long = self.flip_long_radio.isChecked()
+
+                    def _eff(e: dict) -> tuple[bool, bool]:
+                        ov = e.get("duplex_override")
+                        if ov is None:
+                            return (global_duplex, global_flip_long)
+                        if not ov:
+                            return (False, True)
+                        return (True, not e.get("flip_short_edge", False))
+
+                    groups: list[tuple[list, bool, bool]] = []
+                    for _e in fitz_entries:
+                        _d, _fl = _eff(_e)
+                        if groups and groups[-1][1] == _d and groups[-1][2] == _fl:
+                            groups[-1][0].append(_e)
+                        else:
+                            groups.append(([_e], _d, _fl))
+
+                    all_tmps: list[str] = []
                     try:
-                        print_pdf_qt(
-                            tmp,
-                            printer_name,
-                            copies=self.copies_spin.value(),
-                            grayscale=self.grayscale_check.isChecked(),
-                            duplex=self.duplex_check.isChecked(),
-                            flip_long=self.flip_long_radio.isChecked(),
-                            paper_size=self.config.get("paper_size", "Letter"),
-                        )
+                        for group_entries, _d, _fl in groups:
+                            g_tmp = compose_nup_pdf(group_entries, **compose_kwargs)
+                            all_tmps.append(g_tmp)
+                            print_pdf_qt(
+                                g_tmp, printer_name,
+                                copies=self.copies_spin.value(),
+                                grayscale=self.grayscale_check.isChecked(),
+                                duplex=_d, flip_long=_fl,
+                                paper_size=self.config.get("paper_size", "Letter"),
+                            )
                     finally:
-                        try:
-                            os.unlink(tmp)
-                        except OSError:
-                            pass
+                        for p in all_tmps:
+                            try:
+                                os.unlink(p)
+                            except OSError:
+                                pass
             except Exception as e:
                 errors.append(f"Rendered print failed: {e}")
 

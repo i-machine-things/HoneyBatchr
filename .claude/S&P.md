@@ -160,17 +160,46 @@ Review this file before making changes to the codebase.
 
 ---
 
-## 2026-05-09 — `.github/workflows/code-audit.yml` + `coderabbit-rate-limit.yml` (PR #14 — ci/quality-control-hub)
+## 2026-05-08 — `main.py` + `modules/updater.py` + `modules/app.py` (PR #13 — feat/update-checker)
 
-**Review:** CodeRabbit review of quality control hub workflows — 2 actionable findings.
+**Review:** CodeRabbit review of in-app update checker — 3 actionable + 2 nitpicks.
+**Result:** All 5 fixed.
+
+### Findings
+
+1. **`flatpak_dns_fix()` called at module top level**
+   - Side effect on any import of `main` (tests, packaging tools); should only run when app starts
+   - Fix: move call inside `main()`, before `QApplication(sys.argv)`
+
+2. **`random.randint` used for DNS query ID — not cryptographically unpredictable**
+   - Predictable QID allows DNS spoofing; response QID was also never validated
+   - Fix: replace with `secrets.randbelow(65536)`; validate response length ≥ 12 bytes and QID match before parsing
+
+3. **`_getaddrinfo` wrapper parameter named `type` shadows builtin**
+   - Fragile inside function body; Ruff A002 flag
+   - Fix: rename parameter to `socktype` in signature and all call sites
+
+4. **Manual "Check for Updates" blocked by `updates_skipped_version` filter**
+   - `check_for_updates()` connected to `_on_update_available` which silently returns for skipped versions; user-initiated checks should always show the dialog
+   - Fix: add `_on_update_available_manual` that skips the version filter; wire manual checker to it
+
+5. **PE/MZ header check insufficient for installer authenticity (pending)**
+   - Format check confirms the file is a Windows executable but does not verify cryptographic integrity or origin
+   - Status: logged for future investigation — requires determining whether releases use Authenticode signing or a published SHA-256 digest
+
+---
+
+## 2026-05-08 — `modules/updater.py` + `modules/app.py` (PR #13 second review — feat/update-checker)
+
+**Review:** CodeRabbit follow-up review of fix commit — 2 new findings.
 **Result:** Both fixed.
 
 ### Findings
 
-1. **`|| true` masks tool execution failures in audit workflow**
-   - Appending `|| true` to flake8 and bandit runs causes the job to report success even when the tools crash (bad config, missing dependency, disk error); real failures are indistinguishable from clean runs
-   - Fix: replace `|| true` with `--exit-zero` on both tools — findings pass the step while execution errors still fail the job
+1. **`UpdateChecker.run()` silently swallows all network/JSON errors**
+   - Broad `except ... pass` meant the UI never learned of failures; manual "Check for Updates" would just do nothing on network error
+   - Fix: add `check_failed = pyqtSignal(str)` to `UpdateChecker`; emit it with `str(exc)` instead of `pass`; connect it in `check_for_updates()` (manual path only) to show a `QMessageBox.warning`
 
-2. **`timeout-minutes: 90` too short for worst-case rate-limit wait**
-   - A 1-hour CR rate limit + 60 s buffer + step overhead can exceed 90 min, causing the job to time out before posting `@coderabbitai resume/review`
-   - Fix: increase to `timeout-minutes: 180`
+2. **`UpdateDownloader.finished` shadows `QThread`'s built-in `finished()` signal**
+   - `QThread` emits a parameterless `finished()` when `run()` returns; declaring `finished = pyqtSignal(str)` at the Python level shadows it, causing `thread.finished.connect(worker.deleteLater)` to connect to the wrong overload
+   - Fix: rename signal to `download_finished`; update `self.finished.emit(...)`, `downloader.finished.connect(_on_done)`, and `downloader.finished.connect(downloader.deleteLater)` to use the new name

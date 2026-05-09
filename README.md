@@ -152,7 +152,7 @@ HoneyBatchr/
 ## TODO
 
 ### Planned
-- [ ] Per-file duplex override — UI collects `duplex_override` per file; print engine applies global duplex setting only
+- [x] Per-file duplex override — combo in Page Config dialog saves `duplex_override`; print engine groups consecutive entries by effective duplex settings and prints each group as a separate job
 - [ ] Collate support — checkbox present and saved to config; not passed to the rendered print path (`QPrinter.setCollateCopies` not called); ShellExecute path relies on driver
 - [ ] Booklet print mode — UI tab present (subset: both/front/back); fold-order page imposition not implemented in print engine
 - [ ] Scale mode — UI tab present (None / Fit / Reduce / Custom %); not yet applied in print engine
