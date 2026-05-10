@@ -278,7 +278,7 @@ _PRINTER_STYLE_LABELS: dict[str, str] = {v: k for k, v in _PRINTER_STYLE_KEYS.it
 class BatchPrintApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Honey Batchr")
+        self.setWindowTitle("HoneyBatchr")
         self.setMinimumSize(820, 580)
         self.resize(1020, 700)
 
@@ -727,6 +727,7 @@ class BatchPrintApp(QMainWindow):
 
     def _build_menu(self):
         menubar = QMenuBar(self)
+        menubar.setNativeMenuBar(False)
         self.setMenuBar(menubar)
 
         file_menu = menubar.addMenu("File")
