@@ -32,6 +32,7 @@ DEFAULT_CONFIG: dict = {
     "page_margin_top": 0.02,
     "page_margin_bottom": 0.02,
     "theme": "Fusion Light",
+    "recent_files": [],
 }
 
 
