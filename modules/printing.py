@@ -5,13 +5,13 @@ import sys
 import math
 import tempfile
 
-
-class PrintCanceledError(Exception):
-    """Raised when the user cancels a print job."""
-
 from PyQt6.QtWidgets import QComboBox
 
 from modules.utils import parse_page_range, slot_to_grid
+
+
+class PrintCanceledError(Exception):
+    """Raised when the user cancels a print job."""
 
 # Paper sizes in inches (portrait: width x height)
 PAPER_SIZES: dict[str, tuple[float, float]] = {
