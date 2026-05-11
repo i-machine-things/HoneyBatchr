@@ -1,5 +1,5 @@
 """
-Honey Batchr - Batch Printing Application
+HoneyBatchr - Batch Printing Application
 Entry point.
 """
 

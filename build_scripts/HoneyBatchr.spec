@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec file for Honey Batchr - one-dir build (fast startup)
+# PyInstaller spec file for HoneyBatchr - one-dir build (fast startup)
 
 import os
 from PyInstaller.utils.hooks import collect_data_files

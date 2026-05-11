@@ -1,4 +1,4 @@
-#define MyAppName "Honey Batchr"
+#define MyAppName "HoneyBatchr"
 #define MyAppVersion GetEnv("RELEASE_VERSION")
 #define MyAppPublisher "i-machine-things"
 #define MyAppURL "https://github.com/i-machine-things/HoneyBatchr"

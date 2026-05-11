@@ -233,7 +233,7 @@ class UpdateDialog(QDialog):
             reply = QMessageBox.question(
                 self, "Ready to Install",
                 f"{self._latest_version} downloaded.\n\n"
-                "Honey Batchr will close and the installer will launch.\nReady to install?",
+                "HoneyBatchr will close and the installer will launch.\nReady to install?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.Yes:
