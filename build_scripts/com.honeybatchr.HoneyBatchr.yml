@@ -5,6 +5,7 @@ sdk: org.freedesktop.Sdk
 command: honeybatchr
 finish-args:
   - --share=ipc
+  - --share=network
   - --socket=fallback-x11
   - --socket=wayland
   - --device=dri
@@ -16,36 +17,26 @@ modules:
     buildsystem: simple
     build-commands:
       - mkdir -p /app/lib/honeybatchr
-      - cp -r . /app/lib/honeybatchr/
-      - chmod +x /app/lib/honeybatchr/HoneyBatchr
+      - cp -r src/. /app/lib/honeybatchr/
+      - pip3 install --no-index --find-links=wheels/ --target /app/lib/honeybatchr/ -r /app/lib/honeybatchr/requirements.txt
       - install -Dm755 honeybatchr.sh /app/bin/honeybatchr
+      - install -Dm644 src/resources/badger_256.png /app/share/icons/hicolor/256x256/apps/com.honeybatchr.HoneyBatchr.png
+      - install -Dm644 src/resources/badger_128.png /app/share/icons/hicolor/128x128/apps/com.honeybatchr.HoneyBatchr.png
+      - install -Dm644 src/resources/badger_64.png  /app/share/icons/hicolor/64x64/apps/com.honeybatchr.HoneyBatchr.png
+      - install -Dm644 src/resources/badger_48.png  /app/share/icons/hicolor/48x48/apps/com.honeybatchr.HoneyBatchr.png
+      - install -Dm644 src/resources/badger_32.png  /app/share/icons/hicolor/32x32/apps/com.honeybatchr.HoneyBatchr.png
       - install -Dm644 com.honeybatchr.HoneyBatchr.desktop /app/share/applications/com.honeybatchr.HoneyBatchr.desktop
-      - install -Dm644 icon_256.png /app/share/icons/hicolor/256x256/apps/com.honeybatchr.HoneyBatchr.png
-      - install -Dm644 icon_128.png /app/share/icons/hicolor/128x128/apps/com.honeybatchr.HoneyBatchr.png
-      - install -Dm644 icon_64.png /app/share/icons/hicolor/64x64/apps/com.honeybatchr.HoneyBatchr.png
-      - install -Dm644 icon_48.png /app/share/icons/hicolor/48x48/apps/com.honeybatchr.HoneyBatchr.png
-      - install -Dm644 icon_32.png /app/share/icons/hicolor/32x32/apps/com.honeybatchr.HoneyBatchr.png
     sources:
       - type: dir
-        path: ../dist/HoneyBatchr
+        path: ../linux/flatpak/src
+        dest: src
+      - type: dir
+        path: ../linux/flatpak/wheels
+        dest: wheels
       - type: script
         dest-filename: honeybatchr.sh
         commands:
-          - exec /app/lib/honeybatchr/HoneyBatchr "$@"
+          - export PYTHONPATH=/app/lib/honeybatchr
+          - exec python3 /app/lib/honeybatchr/main.py "$@"
       - type: file
         path: com.honeybatchr.HoneyBatchr.desktop
-      - type: file
-        path: ../resources/badger_256.png
-        dest-filename: icon_256.png
-      - type: file
-        path: ../resources/badger_128.png
-        dest-filename: icon_128.png
-      - type: file
-        path: ../resources/badger_64.png
-        dest-filename: icon_64.png
-      - type: file
-        path: ../resources/badger_48.png
-        dest-filename: icon_48.png
-      - type: file
-        path: ../resources/badger_32.png
-        dest-filename: icon_32.png
