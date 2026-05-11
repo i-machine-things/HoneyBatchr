@@ -11,9 +11,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     if (last) *last = L'\0';
 
     wchar_t cmd[MAX_PATH * 3];
-    swprintf(cmd, MAX_PATH * 3,
-             L"\"%s\\runtime\\python.exe\" \"%s\\app\\main.py\"",
-             base, base);
+    _snwprintf(cmd, MAX_PATH * 3,
+               L"\"%s\\runtime\\python.exe\" \"%s\\app\\main.py\"",
+               base, base);
 
     STARTUPINFOW        si = {sizeof(si)};
     PROCESS_INFORMATION pi = {0};
