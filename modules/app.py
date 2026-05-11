@@ -74,7 +74,8 @@ class PrintWorker(QThread):
                 first = os.path.basename(group_entries[0]["path"])
                 label = first if len(group_entries) == 1 else f"{first} (+{len(group_entries) - 1} more)"
                 self.step_done.emit(step, total_steps, f"Composing: {label}")
-                g_tmp = compose_nup_pdf(group_entries, **self.compose_kwargs)
+                g_tmp = compose_nup_pdf(group_entries, **self.compose_kwargs,
+                                        cancel_check=lambda: self._canceled)
                 all_tmps.append(g_tmp)
                 if self._canceled:
                     break
@@ -1355,7 +1356,7 @@ class BatchPrintApp(QMainWindow):
 
         def _on_step(current: int, total: int, label: str) -> None:
             dlg.setLabelText(label)
-            dlg.setValue(current - 1)
+            dlg.setValue(current)
 
         def _on_page(current: int, total: int) -> None:
             dlg.setLabelText(f"Printing page {current} of {total}…")

@@ -206,6 +206,27 @@ Review this file before making changes to the codebase.
 
 ---
 
+## 2026-05-11 — `modules/app.py` + `modules/printing.py` (PR #32 — feat/progress-bar-cancel)
+
+**Review:** CodeRabbit review of async print worker with progress/cancel — 2 actionable + 1 nitpick.
+**Result:** All 3 fixed.
+
+### Findings
+
+1. **`compose_nup_pdf` could not be canceled mid-compose**
+   - `PrintWorker.run()` called `compose_nup_pdf` with no cancel callback; a long composition blocked the thread with no way to abort
+   - Fix: add `cancel_check=None` param to `compose_nup_pdf`; check it at the start of each sheet iteration and raise `PrintCanceledError` (closing `src` and `out` first); pass `cancel_check=lambda: self._canceled` from `PrintWorker.run()`
+
+2. **`page_progress` callback called before page render completes**
+   - `page_progress(i + 1, total_pages)` ran before `page = doc[i]` and the render pipeline; progress was over-reported if render failed
+   - Fix: move `page_progress` call to after `painter.drawImage(...)` so it fires only on successful render
+
+3. **Progress dialog lagged one step behind (nitpick)**
+   - `_on_step` used `dlg.setValue(current - 1)`, making the bar appear stalled until the next step
+   - Fix: change to `dlg.setValue(current)` for accurate real-time progress
+
+---
+
 ## 2026-05-10 — `modules/app.py` (PR #31 — feat/recent-files-list)
 
 **Review:** CodeRabbit review of recent files list feature — 1 critical + 1 nitpick.

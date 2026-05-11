@@ -69,6 +69,7 @@ def compose_nup_pdf(
     page_margin_right: float = 0.0,
     page_margin_top: float = 0.0,
     page_margin_bottom: float = 0.0,
+    cancel_check=None,
 ) -> str:
     """Render all entries into a single N-up PDF and return its temp path."""
     import fitz  # type: ignore[import]
@@ -168,6 +169,10 @@ def compose_nup_pdf(
             continue
 
         for sheet_start in range(0, len(indices), nup):
+            if cancel_check and cancel_check():
+                src.close()
+                out.close()
+                raise PrintCanceledError()
             slot_indices = indices[sheet_start:sheet_start + nup]
             page = out.new_page(width=pw, height=ph)
             for slot, idx in enumerate(slot_indices):
@@ -361,8 +366,6 @@ def print_pdf_qt(
                 printer.abort()
                 doc.close()
                 raise PrintCanceledError()
-            if page_progress:
-                page_progress(i + 1, total_pages)
             page = doc[i]
             if i > 0:
                 printer.newPage()
@@ -384,6 +387,8 @@ def print_pdf_qt(
             x = (dw - iw) // 2
             y = (dh - ih) // 2
             painter.drawImage(QRect(x, y, iw, ih), img)
+            if page_progress:
+                page_progress(i + 1, total_pages)
         doc.close()
     finally:
         painter.end()
