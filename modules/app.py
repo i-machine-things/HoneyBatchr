@@ -1008,6 +1008,18 @@ class BatchPrintApp(QMainWindow):
         self.config["recent_files"] = []
         update_config_value("recent_files", [])
 
+    def _add_recent_file(self, path: str) -> None:
+        if not os.path.isfile(path):
+            QMessageBox.warning(self, "File Not Found",
+                                f"The file no longer exists:\n{path}")
+            recent: List[str] = self.config.get("recent_files", [])
+            if path in recent:
+                recent.remove(path)
+                self.config["recent_files"] = recent
+                update_config_value("recent_files", recent)
+            return
+        self.add_files_to_list([path])
+
     def _populate_recent_menu(self) -> None:
         if not self._recent_files_menu:
             return
@@ -1017,7 +1029,7 @@ class BatchPrintApp(QMainWindow):
             for path in recent:
                 act = QAction(os.path.basename(path), self)
                 act.setToolTip(path)
-                act.triggered.connect(lambda _, p=path: self.add_files_to_list([p]))
+                act.triggered.connect(lambda _, p=path: self._add_recent_file(p))
                 self._recent_files_menu.addAction(act)
             self._recent_files_menu.addSeparator()
             clear_act = QAction("Clear Recent Files", self)
@@ -1336,6 +1348,7 @@ class BatchPrintApp(QMainWindow):
                 "page_margin_top":    self.config.get("page_margin_top",    0.02),
                 "page_margin_bottom": self.config.get("page_margin_bottom", 0.02),
                 "theme": self.config.get("theme", "Fusion Light"),
+                "recent_files": self.config.get("recent_files", []),
             }
             write_config(data)
             if not silent:
