@@ -3,10 +3,240 @@ name: Build & Release
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version string (e.g. v0.7.4-test)'
+        required: false
+        default: 'v0.0.0-test'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
-  release:
+  verify-master-ancestry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag is descended from master
+        run: |
+          git fetch origin master
+          if ! git merge-base --is-ancestor origin/master "$GITHUB_SHA"; then
+            echo "ERROR: Tag $GITHUB_REF_NAME is not descended from master. Only tag from master."
+            exit 1
+          fi
+          echo "OK: $GITHUB_REF_NAME is descended from master"
+
+  # ---------------------------------------------------------------------------
+  # Windows — Embedded Python + source files packaged by Inno Setup
+  #
+  # Layout inside the installer:
+  #   {app}\HoneyBatchr.exe    tiny C launcher (no console)
+  #   {app}\app\               Python source tree
+  #   {app}\runtime\           Python 3.12 embeddable + pre-installed deps
+  # ---------------------------------------------------------------------------
+  build-windows:
+    needs: verify-master-ancestry
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    env:
+      PY_VER: "3.12.9"
+      PY_EMBED_SHA256: "615861fb801e8b04c847598db4e1e46e4b046295017caa37cb5486dde72b5865"
+      RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python for bootstrapping
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download Python embeddable
+        shell: pwsh
+        run: |
+          $url = "https://www.python.org/ftp/python/$env:PY_VER/python-$env:PY_VER-embed-amd64.zip"
+          Invoke-WebRequest $url -OutFile python-embed.zip
+          $actual = (Get-FileHash python-embed.zip -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $env:PY_EMBED_SHA256) {
+            Write-Error "SHA256 mismatch`nExpected: $env:PY_EMBED_SHA256`nActual:   $actual"
+            exit 1
+          }
+          Expand-Archive python-embed.zip -DestinationPath runtime
+
+      - name: Enable site-packages in embedded Python
+        shell: pwsh
+        run: |
+          $pth = Get-Item runtime\python3*._pth
+          $content = (Get-Content $pth) -replace '#import site', 'import site'
+          # ../app makes modules/ importable from the staged source tree
+          $content += "`n../app"
+          $content | Set-Content $pth
+          New-Item -ItemType Directory -Path runtime\Lib\site-packages -Force | Out-Null
+
+      - name: Bootstrap pip into embedded Python
+        shell: pwsh
+        run: |
+          python -m pip install --target runtime\Lib\site-packages --no-deps "pip==24.3.1"
+          runtime\python.exe -m pip --version
+
+      - name: Install app dependencies into embedded Python
+        shell: pwsh
+        run: runtime\python.exe -m pip install -r requirements.txt --no-warn-script-location
+
+      - name: Stage app source tree
+        shell: pwsh
+        run: |
+          $src_items = @('main.py', 'module.py', 'modules', 'resources', 'requirements.txt')
+          New-Item -ItemType Directory -Path app -Force | Out-Null
+          foreach ($item in $src_items) {
+            if (Test-Path $item) {
+              Copy-Item $item app\ -Recurse -Force
+            }
+          }
+
+      - name: Inject version into _version.py
+        shell: pwsh
+        run: |
+          $ver = "${{ env.RELEASE_VERSION }}"
+          "# Stamped by the release workflow. `"dev`" triggers a git-describe fallback at runtime.`n__version__ = '$ver'" | Set-Content app\modules\_version.py -Encoding utf8
+
+      - name: Compile launcher (MinGW)
+        shell: bash
+        run: |
+          VER="${{ env.RELEASE_VERSION }}"
+          VER="${VER#v}"
+          VER="${VER%%-*}"
+          IFS='.' read -r MAJOR MINOR PATCH rest <<< "$VER"
+          MAJOR=${MAJOR:-0}; MINOR=${MINOR:-0}; PATCH=${PATCH:-0}
+          windres launcher/launcher.rc -O coff -o launcher_res.o \
+            -D VERSION_MAJOR="$MAJOR" -D VERSION_MINOR="$MINOR" \
+            -D VERSION_PATCH="$PATCH" -D VERSION_BUILD=0
+          gcc -mwindows -O2 -o HoneyBatchr.exe launcher/launcher.c launcher_res.o
+
+      - name: Verify build
+        shell: pwsh
+        run: |
+          if (!(Test-Path "HoneyBatchr.exe"))      { Write-Error "HoneyBatchr.exe not found"; exit 1 }
+          if (!(Test-Path "runtime\python.exe"))   { Write-Error "runtime\python.exe not found"; exit 1 }
+          if (!(Test-Path "app\main.py"))           { Write-Error "app\main.py not found"; exit 1 }
+          Write-Output "Launcher: $(Get-Item HoneyBatchr.exe | Select-Object -ExpandProperty Length) bytes"
+          Write-Output "Runtime Python: $(runtime\python.exe --version)"
+          runtime\python.exe -c "import PyQt6; import modules.config; print('imports OK')"
+          if ($LASTEXITCODE -ne 0) { Write-Error "App imports failed"; exit 1 }
+
+      - name: Ensure Inno Setup is available
+        shell: pwsh
+        run: |
+          if (!(Get-Command iscc -ErrorAction SilentlyContinue)) {
+            choco install innosetup --confirm --no-progress
+          }
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $env:RELEASE_VERSION = "${{ env.RELEASE_VERSION }}"
+          iscc build_scripts\HoneyBatchr.iss
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HoneyBatchr-windows
+          path: installer_out/HoneyBatchr-${{ env.RELEASE_VERSION }}-windows-setup.exe
+
+  # ---------------------------------------------------------------------------
+  # Linux — Python source packaged as a Flatpak bundle
+  # ---------------------------------------------------------------------------
+  build-flatpak:
+    needs: verify-master-ancestry
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Flatpak tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y flatpak flatpak-builder
+
+      - name: Cache Flatpak runtimes
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/flatpak
+          key: flatpak-runtime-freedesktop-24.08-${{ runner.arch }}
+          restore-keys: |
+            flatpak-runtime-freedesktop-24.08-
+
+      - name: Add Flathub remote
+        run: flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+      - name: Install Flatpak runtime
+        run: |
+          flatpak install --user -y flathub \
+            org.freedesktop.Platform//24.08 \
+            org.freedesktop.Sdk//24.08
+
+      - name: Stage source files and download wheels
+        run: |
+          mkdir -p linux/flatpak/src linux/flatpak/wheels
+          for item in main.py module.py modules resources requirements.txt; do
+            [ -e "$item" ] && cp -r "$item" linux/flatpak/src/
+          done
+          pip download --only-binary :all: -d linux/flatpak/wheels/ -r requirements.txt
+
+      - name: Inject version into _version.py
+        run: |
+          VERSION="${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}"
+          printf '# Stamped by the release workflow. "dev" triggers a git-describe fallback at runtime.\n__version__ = "%s"\n' "$VERSION" \
+            > linux/flatpak/src/modules/_version.py
+
+      - name: Build Flatpak
+        run: |
+          flatpak-builder \
+            --user \
+            --repo=flatpak-repo \
+            --force-clean \
+            flatpak-build \
+            build_scripts/com.honeybatchr.HoneyBatchr.yml
+          flatpak build-bundle \
+            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
+            flatpak-repo \
+            HoneyBatchr-linux.flatpak \
+            com.honeybatchr.HoneyBatchr
+
+      - name: Verify Flatpak bundle
+        run: |
+          test -f HoneyBatchr-linux.flatpak || { echo "HoneyBatchr-linux.flatpak not found"; exit 1; }
+          echo "Flatpak OK: $(du -h HoneyBatchr-linux.flatpak | cut -f1)"
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HoneyBatchr-linux
+          path: HoneyBatchr-linux.flatpak
+
+  # ---------------------------------------------------------------------------
+  # Release — combine both platform artifacts into a single GitHub Release
+  # ---------------------------------------------------------------------------
+  create-release:
+    needs: [build-windows, build-flatpak]
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -15,24 +245,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Stamp version
-        run: |
-          printf '# Stamped by the release workflow. "dev" triggers a git-describe fallback at runtime.\n__version__ = "%s"\n' "${{ github.ref_name }}" > modules/_version.py
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: HoneyBatchr-windows
+          path: release-assets
 
-      - name: Create source archive
-        run: |
-          zip -r HoneyBatchr-${{ github.ref_name }}.zip \
-            module.py \
-            main.py \
-            requirements.txt \
-            modules/ \
-            resources/ \
-            --exclude "*/__pycache__/*" \
-            --exclude "*/*.pyc" \
-            --exclude "*/*.pyo"
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: HoneyBatchr-linux
+          path: release-assets
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: HoneyBatchr-${{ github.ref_name }}.zip
+          name: HoneyBatchr ${{ github.ref_name }}
+          files: |
+            release-assets/HoneyBatchr-${{ github.ref_name }}-windows-setup.exe
+            release-assets/HoneyBatchr-linux.flatpak
           generate_release_notes: true
+          fail_on_unmatched_files: true
