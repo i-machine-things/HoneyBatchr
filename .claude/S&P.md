@@ -203,3 +203,20 @@ Review this file before making changes to the codebase.
 2. **`UpdateDownloader.finished` shadows `QThread`'s built-in `finished()` signal**
    - `QThread` emits a parameterless `finished()` when `run()` returns; declaring `finished = pyqtSignal(str)` at the Python level shadows it, causing `thread.finished.connect(worker.deleteLater)` to connect to the wrong overload
    - Fix: rename signal to `download_finished`; update `self.finished.emit(...)`, `downloader.finished.connect(_on_done)`, and `downloader.finished.connect(downloader.deleteLater)` to use the new name
+
+---
+
+## 2026-05-10 — `modules/app.py` (PR #31 — feat/recent-files-list)
+
+**Review:** CodeRabbit review of recent files list feature — 1 critical + 1 nitpick.
+**Result:** Both fixed.
+
+### Findings
+
+1. **`save_config` erased the recent files list on every save**
+   - `save_config` built a fresh dict from UI widgets and called `write_config(data)`, which completely replaced the config file; `recent_files` was not included so every Ctrl+S wiped the list
+   - Fix: add `"recent_files": self.config.get("recent_files", [])` to the data dict in `save_config` before calling `write_config`
+
+2. **Clicking a missing recent file gave no feedback**
+   - `add_files_to_list` silently skips paths where `os.path.isfile` returns False; user sees nothing happen
+   - Fix: add `_add_recent_file(path)` helper — checks existence, shows `QMessageBox.warning`, removes the dead path from the recent list, then calls `add_files_to_list`; wire `_populate_recent_menu` to use this helper

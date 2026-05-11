@@ -278,7 +278,7 @@ _PRINTER_STYLE_LABELS: dict[str, str] = {v: k for k, v in _PRINTER_STYLE_KEYS.it
 class BatchPrintApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Honey Batchr")
+        self.setWindowTitle("HoneyBatchr")
         self.setMinimumSize(820, 580)
         self.resize(1020, 700)
 
@@ -288,6 +288,7 @@ class BatchPrintApp(QMainWindow):
 
         self.file_entries: List[dict] = []
         self._theme_actions: List[QAction] = []
+        self._recent_files_menu: QMenu | None = None
         self.config = load_config()
         self.init_ui()
         QTimer.singleShot(3000, self._start_auto_update_check)
@@ -726,6 +727,7 @@ class BatchPrintApp(QMainWindow):
 
     def _build_menu(self):
         menubar = QMenuBar(self)
+        menubar.setNativeMenuBar(False)
         self.setMenuBar(menubar)
 
         file_menu = menubar.addMenu("File")
@@ -734,6 +736,10 @@ class BatchPrintApp(QMainWindow):
             add_act.setShortcut("Ctrl+O")
             add_act.triggered.connect(self.add_files)
             file_menu.addAction(add_act)
+            file_menu.addSeparator()
+            self._recent_files_menu = file_menu.addMenu("Recent Files")
+            if self._recent_files_menu:
+                self._recent_files_menu.aboutToShow.connect(self._populate_recent_menu)
             file_menu.addSeparator()
             save_act = QAction("Save Settings", self)
             save_act.setShortcut("Ctrl+S")
@@ -963,7 +969,7 @@ class BatchPrintApp(QMainWindow):
 
     def add_files_to_list(self, files: List[str]):
         existing = {e["path"] for e in self.file_entries}
-        added = 0
+        added_paths: List[str] = []
         for path in files:
             if not os.path.isfile(path) or path in existing:
                 continue
@@ -983,9 +989,56 @@ class BatchPrintApp(QMainWindow):
                 "range": page_range,
             })
             existing.add(path)
-            added += 1
-        if added:
+            added_paths.append(path)
+        if added_paths:
             self._refresh_table()
+            self._add_to_recent(added_paths)
+
+    def _add_to_recent(self, paths: List[str]) -> None:
+        recent: List[str] = list(self.config.get("recent_files", []))
+        for path in reversed(paths):
+            if path in recent:
+                recent.remove(path)
+            recent.insert(0, path)
+        recent = recent[:10]
+        self.config["recent_files"] = recent
+        update_config_value("recent_files", recent)
+
+    def _clear_recent_files(self) -> None:
+        self.config["recent_files"] = []
+        update_config_value("recent_files", [])
+
+    def _add_recent_file(self, path: str) -> None:
+        if not os.path.isfile(path):
+            QMessageBox.warning(self, "File Not Found",
+                                f"The file no longer exists:\n{path}")
+            recent: List[str] = self.config.get("recent_files", [])
+            if path in recent:
+                recent.remove(path)
+                self.config["recent_files"] = recent
+                update_config_value("recent_files", recent)
+            return
+        self.add_files_to_list([path])
+
+    def _populate_recent_menu(self) -> None:
+        if not self._recent_files_menu:
+            return
+        self._recent_files_menu.clear()
+        recent: List[str] = self.config.get("recent_files", [])
+        if recent:
+            for path in recent:
+                act = QAction(os.path.basename(path), self)
+                act.setToolTip(path)
+                act.triggered.connect(lambda _, p=path: self._add_recent_file(p))
+                self._recent_files_menu.addAction(act)
+            self._recent_files_menu.addSeparator()
+            clear_act = QAction("Clear Recent Files", self)
+            clear_act.triggered.connect(self._clear_recent_files)
+            self._recent_files_menu.addAction(clear_act)
+        else:
+            empty_act = QAction("(no recent files)", self)
+            empty_act.setEnabled(False)
+            self._recent_files_menu.addAction(empty_act)
 
     def _refresh_table(self):
         self.file_table.setRowCount(0)
@@ -1295,6 +1348,7 @@ class BatchPrintApp(QMainWindow):
                 "page_margin_top":    self.config.get("page_margin_top",    0.02),
                 "page_margin_bottom": self.config.get("page_margin_bottom", 0.02),
                 "theme": self.config.get("theme", "Fusion Light"),
+                "recent_files": self.config.get("recent_files", []),
             }
             write_config(data)
             if not silent:
