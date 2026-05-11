@@ -147,25 +147,3 @@ HoneyBatchr/
 | Printer not listed | Check Windows Devices & Printers; restart app |
 | Context menu missing | Run `register_context_menu.bat` as Administrator |
 
----
-
-## TODO
-
-### Planned
-- [x] Per-file duplex override — combo in Page Config dialog saves `duplex_override`; print engine groups consecutive entries by effective duplex settings and prints each group as a separate job
-- [ ] Collate support — checkbox present and saved to config; not passed to the rendered print path (`QPrinter.setCollateCopies` not called); ShellExecute path relies on driver
-- [ ] Booklet print mode — UI tab present (subset: both/front/back); fold-order page imposition not implemented in print engine
-- [ ] Scale mode — UI tab present (None / Fit / Reduce / Custom %); not yet applied in print engine
-- [ ] Tile Large Pages mode — UI tab present (zoom, overlap, cut marks, labels); not yet applied in print engine
-- [ ] Print What: Document vs. Document and markups — combo present and saved; PDF annotation filtering not applied during composition
-- [ ] Simulate Overprinting — checkbox present and saved; Fusion blend mode rendering not applied in print engine
-- [ ] Bleed Marks output — checkbox present and saved; not applied during composition
-- [ ] Advanced printer settings dialog — button present; shows placeholder only
-- [ ] Page Setting dialog (paper size, source tray) — button present; shows placeholder only
-- [ ] Loop printing in list order (continuous/kiosk mode) — checkbox present but disabled
-- [ ] Windows right-click context menu auto-registration on first run (without requiring Admin separately)
-- [ ] Progress bar / cancel button during long print jobs
-- [ ] Print preview for the full job before sending
-- [ ] Recent files list
-
-
