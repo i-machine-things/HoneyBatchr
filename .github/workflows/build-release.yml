@@ -6,39 +6,7 @@ on:
       - "v*"
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Build with PyInstaller
-        run: python -m PyInstaller build_scripts/HoneyBatchr.spec --clean --noconfirm
-
-      - name: Build Windows installer
-        run: |
-          $env:RELEASE_VERSION = "${{ github.ref_name }}"
-          iscc build_scripts\HoneyBatchr.iss
-        shell: pwsh
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: installer_out/HoneyBatchr-${{ github.ref_name }}-windows-setup.exe
-          generate_release_notes: true
-
-  build-linux:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -47,47 +15,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install system dependencies
+      - name: Stamp version
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y \
-            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
-            libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 \
-            libxkbcommon-x11-0 \
-            flatpak flatpak-builder
+          printf '# Stamped by the release workflow. "dev" triggers a git-describe fallback at runtime.\n__version__ = "%s"\n' "${{ github.ref_name }}" > modules/_version.py
 
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
-
-      - name: Build with PyInstaller
-        run: python -m PyInstaller build_scripts/HoneyBatchr.spec --clean --noconfirm
-
-      - name: Add Flathub remote
-        run: flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-
-      - name: Install Flatpak runtime and SDK
-        run: flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
-
-      - name: Build Flatpak
+      - name: Create source archive
         run: |
-          flatpak-builder --user --install --force-clean \
-            flatpak-build build_scripts/com.honeybatchr.HoneyBatchr.yml
+          zip -r HoneyBatchr-${{ github.ref_name }}.zip \
+            module.py \
+            main.py \
+            requirements.txt \
+            modules/ \
+            resources/ \
+            --exclude "*/__pycache__/*" \
+            --exclude "*/*.pyc" \
+            --exclude "*/*.pyo"
 
-      - name: Bundle Flatpak
-        run: |
-          flatpak build-bundle \
-            ~/.local/share/flatpak/repo \
-            HoneyBatchr-${{ github.ref_name }}-linux.flatpak \
-            com.honeybatchr.HoneyBatchr \
-            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
-
-      - name: Upload to GitHub Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: HoneyBatchr-${{ github.ref_name }}-linux.flatpak
-          generate_release_notes: false
+          files: HoneyBatchr-${{ github.ref_name }}.zip
+          generate_release_notes: true
