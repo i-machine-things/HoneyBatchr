@@ -20,7 +20,7 @@ from PyQt6.QtGui import QIcon, QAction, QActionGroup, QPainter, QPen, QColor, QF
 from modules.config import CONFIG_FILE, load_config, write_config, update_config_value
 from modules.updater import UpdateChecker, UpdateDialog, APP_VERSION
 from modules.utils import FITZ_EXTS, pdf_page_count
-from modules.themes import light_palette, dark_palette, STYLESHEET
+from modules.themes import light_palette, dark_palette, STYLESHEET, DARK_STYLESHEET
 from modules.widgets import DroppableTable
 from modules.dialogs import PageConfigDialog
 from modules.printing import (
@@ -711,7 +711,7 @@ class BatchPrintApp(QMainWindow):
             "Setting the margins to adjust the distance between\n"
             "two columns or rows."
         )
-        info.setStyleSheet("color: #0066cc; font-size: 13px;")
+        info.setStyleSheet("color: palette(link); font-size: 13px;")
         margin_row.addWidget(info)
         margin_row.addStretch()
         gl.addLayout(margin_row, 2, 0, 1, 2)
@@ -1023,7 +1023,7 @@ class BatchPrintApp(QMainWindow):
         elif name == "Fusion Dark":
             app.setStyle("Fusion")
             app.setPalette(dark_palette())
-            app.setStyleSheet(STYLESHEET)
+            app.setStyleSheet(DARK_STYLESHEET)
         else:
             app.setStyle(name)
             style = app.style()

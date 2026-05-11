@@ -55,6 +55,61 @@ QFrame#rightPanel {
 }
 """
 
+DARK_STYLESHEET = """
+QToolTip {
+    background-color: #3c3c3c;
+    color: #dcdcdc;
+    border: 1px solid #666666;
+    padding: 4px;
+}
+QGroupBox {
+    border: 1px solid #555555;
+    border-radius: 3px;
+    margin-top: 10px;
+    padding-top: 6px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 8px;
+    padding: 0 4px;
+}
+QPushButton#modeBtn {
+    border: 1px solid #666666;
+    border-radius: 2px;
+    padding: 6px 4px;
+    background-color: #404040;
+    min-height: 40px;
+    color: #dcdcdc;
+}
+QPushButton#modeBtn:checked {
+    background-color: #1e4d80;
+    border-color: #4488cc;
+}
+QPushButton#modeBtn:hover:!checked {
+    background-color: #4a4a4a;
+}
+QTableWidget {
+    border: 1px solid #555555;
+    gridline-color: #555555;
+    selection-background-color: #2a82da;
+    selection-color: #ffffff;
+    alternate-background-color: #373737;
+}
+QHeaderView::section {
+    background-color: #3d3d3d;
+    color: #dcdcdc;
+    border: none;
+    border-right: 1px solid #555555;
+    border-bottom: 1px solid #555555;
+    padding: 3px 4px;
+    font-weight: normal;
+}
+QFrame#rightPanel {
+    background-color: #333333;
+    border: 1px solid #555555;
+}
+"""
+
 
 def light_palette() -> QPalette:
     p = QPalette()
