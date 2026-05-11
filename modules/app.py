@@ -12,18 +12,145 @@ from PyQt6.QtWidgets import (
     QSpinBox, QDoubleSpinBox, QComboBox, QCheckBox, QMessageBox, QMenu, QFrame,
     QStatusBar, QMenuBar, QButtonGroup, QAbstractItemView, QSizePolicy,
     QRadioButton, QGroupBox, QTabWidget, QHeaderView, QStyleFactory,
-    QApplication, QDialog,
+    QApplication, QDialog, QProgressDialog,
 )
-from PyQt6.QtCore import Qt, QItemSelectionModel, QRectF, QTimer
+from PyQt6.QtCore import Qt, QItemSelectionModel, QRectF, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon, QAction, QActionGroup, QPainter, QPen, QColor, QFont
 
 from modules.config import CONFIG_FILE, load_config, write_config, update_config_value
 from modules.updater import UpdateChecker, UpdateDialog, APP_VERSION
 from modules.utils import FITZ_EXTS, pdf_page_count
-from modules.themes import light_palette, dark_palette, STYLESHEET
+from modules.themes import light_palette, dark_palette, STYLESHEET, DARK_STYLESHEET
 from modules.widgets import DroppableTable
 from modules.dialogs import PageConfigDialog
-from modules.printing import populate_printers, compose_nup_pdf, print_pdf_qt, split_for_manual_duplex, PAPER_SIZES
+from modules.printing import (
+    populate_printers, compose_nup_pdf, print_pdf_qt,
+    split_for_manual_duplex, PAPER_SIZES, PrintCanceledError,
+)
+
+
+class PrintWorker(QThread):
+    """Runs a print job in a background thread, emitting progress signals."""
+
+    step_done = pyqtSignal(int, int, str)   # current_step, total_steps, label
+    page_progress = pyqtSignal(int, int)     # current_page, total_pages
+    finished_print = pyqtSignal(list, bool)  # errors, canceled
+
+    def __init__(
+        self,
+        groups: list,
+        other_entries: list,
+        compose_kwargs: dict,
+        printer_name: str,
+        copies: int,
+        grayscale: bool,
+        paper_size: str,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self.groups = groups
+        self.other_entries = other_entries
+        self.compose_kwargs = compose_kwargs
+        self.printer_name = printer_name
+        self.copies = copies
+        self.grayscale = grayscale
+        self.paper_size = paper_size
+        self._canceled = False
+
+    def cancel(self) -> None:
+        self._canceled = True
+
+    def run(self) -> None:
+        errors: list[str] = []
+        total_steps = len(self.groups) + len(self.other_entries)
+        step = 0
+        all_tmps: list[str] = []
+
+        try:
+            for group_entries, _d, _fl in self.groups:
+                if self._canceled:
+                    break
+                step += 1
+                first = os.path.basename(group_entries[0]["path"])
+                label = first if len(group_entries) == 1 else f"{first} (+{len(group_entries) - 1} more)"
+                self.step_done.emit(step, total_steps, f"Composing: {label}")
+                g_tmp = compose_nup_pdf(group_entries, **self.compose_kwargs)
+                all_tmps.append(g_tmp)
+                if self._canceled:
+                    break
+                self.step_done.emit(step, total_steps, f"Printing: {label}")
+                print_pdf_qt(
+                    g_tmp, self.printer_name,
+                    copies=self.copies,
+                    grayscale=self.grayscale,
+                    duplex=_d,
+                    flip_long=_fl,
+                    paper_size=self.paper_size,
+                    cancel_check=lambda: self._canceled,
+                    page_progress=lambda c, t: self.page_progress.emit(c, t),
+                )
+        except PrintCanceledError:
+            pass
+        except Exception as exc:
+            errors.append(f"Rendered print failed: {exc}")
+        finally:
+            for p in all_tmps:
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
+
+        if not self._canceled and self.other_entries:
+            if sys.platform == "win32":
+                try:
+                    import win32api
+                    safe_name = self.printer_name.replace('"', '')
+                    for entry in self.other_entries:
+                        if self._canceled:
+                            break
+                        if os.path.exists(entry["path"]):
+                            step += 1
+                            self.step_done.emit(
+                                step, total_steps,
+                                f"Printing: {os.path.basename(entry['path'])}",
+                            )
+                            win32api.ShellExecute(
+                                0, "printto", entry["path"],
+                                f'"{safe_name}"', ".", 0,
+                            )
+                except Exception as exc:
+                    errors.append(f"ShellExecute print failed: {exc}")
+            else:
+                import subprocess
+                for entry in self.other_entries:
+                    if self._canceled:
+                        break
+                    path = entry["path"]
+                    if not os.path.exists(path):
+                        continue
+                    step += 1
+                    self.step_done.emit(
+                        step, total_steps,
+                        f"Printing: {os.path.basename(path)}",
+                    )
+                    try:
+                        subprocess.run(
+                            ["lp", "-d", self.printer_name, path],
+                            check=True,
+                            capture_output=True,
+                        )
+                    except FileNotFoundError:
+                        errors.append(
+                            "lp command not found. Install CUPS to print non-PDF files on Linux."
+                        )
+                        break
+                    except subprocess.CalledProcessError as exc:
+                        errors.append(
+                            f"lp failed for {os.path.basename(path)}: "
+                            f"{exc.stderr.decode(errors='replace').strip()}"
+                        )
+
+        self.finished_print.emit(errors, self._canceled)
 
 
 class _PaperPreview(QWidget):
@@ -584,7 +711,7 @@ class BatchPrintApp(QMainWindow):
             "Setting the margins to adjust the distance between\n"
             "two columns or rows."
         )
-        info.setStyleSheet("color: #0066cc; font-size: 13px;")
+        info.setStyleSheet("color: palette(link); font-size: 13px;")
         margin_row.addWidget(info)
         margin_row.addStretch()
         gl.addLayout(margin_row, 2, 0, 1, 2)
@@ -896,7 +1023,7 @@ class BatchPrintApp(QMainWindow):
         elif name == "Fusion Dark":
             app.setStyle("Fusion")
             app.setPalette(dark_palette())
-            app.setStyleSheet(STYLESHEET)
+            app.setStyleSheet(DARK_STYLESHEET)
         else:
             app.setStyle(name)
             style = app.style()
@@ -1149,7 +1276,6 @@ class BatchPrintApp(QMainWindow):
 
         self.save_config(silent=True)
         printer_name = self.printer_combo.currentText()
-        manual_duplex_canceled = False
 
         fitz_entries = [
             e for e in self.file_entries
@@ -1160,151 +1286,191 @@ class BatchPrintApp(QMainWindow):
             if os.path.splitext(e["path"])[1].lower() not in FITZ_EXTS
         ]
 
-        errors: list[str] = []
+        if fitz_entries and self.manual_duplex_check.isChecked():
+            self._print_manual_duplex(fitz_entries, other_entries, printer_name)
+            return
+
+        compose_kwargs: dict = {}
+        groups: list[tuple[list, bool, bool]] = []
 
         if fitz_entries:
-            try:
-                nup = max(1, int(self.pages_per_sheet_combo.currentText())) \
-                    if self.mode_tabs.currentIndex() == 2 else 1
-                order = self.page_order_combo.currentText()
-                margin_pts = self.margins_spin.value() * 72 if self.margins_check.isChecked() else 0.0
-                draw_border = self.print_page_border_check.isChecked() and nup > 1
+            nup = max(1, int(self.pages_per_sheet_combo.currentText())) \
+                if self.mode_tabs.currentIndex() == 2 else 1
+            order = self.page_order_combo.currentText()
+            margin_pts = self.margins_spin.value() * 72 if self.margins_check.isChecked() else 0.0
+            draw_border = self.print_page_border_check.isChecked() and nup > 1
 
-                compose_kwargs = dict(
-                    nup=nup, order=order, margin_pts=margin_pts, draw_border=draw_border,
-                    orientation=self.config.get("page_setting_orientation", "Portrait"),
-                    auto_rotate=self.auto_rotate_check.isChecked(),
-                    auto_center=self.auto_center_check.isChecked(),
-                    paper_size=self.config.get("paper_size", "Letter"),
-                    page_margin_left=self.config.get("page_margin_left", 0.02),
-                    page_margin_right=self.config.get("page_margin_right", 0.02),
-                    page_margin_top=self.config.get("page_margin_top", 0.02),
-                    page_margin_bottom=self.config.get("page_margin_bottom", 0.02),
+            compose_kwargs = dict(
+                nup=nup, order=order, margin_pts=margin_pts, draw_border=draw_border,
+                orientation=self.config.get("page_setting_orientation", "Portrait"),
+                auto_rotate=self.auto_rotate_check.isChecked(),
+                auto_center=self.auto_center_check.isChecked(),
+                paper_size=self.config.get("paper_size", "Letter"),
+                page_margin_left=self.config.get("page_margin_left", 0.02),
+                page_margin_right=self.config.get("page_margin_right", 0.02),
+                page_margin_top=self.config.get("page_margin_top", 0.02),
+                page_margin_bottom=self.config.get("page_margin_bottom", 0.02),
+            )
+
+            global_duplex = self.duplex_check.isChecked()
+            global_flip_long = self.flip_long_radio.isChecked()
+
+            def _eff(e: dict) -> tuple[bool, bool]:
+                ov = e.get("duplex_override")
+                if ov is None:
+                    return (global_duplex, global_flip_long)
+                if not ov:
+                    return (False, True)
+                return (True, not e.get("flip_short_edge", False))
+
+            for _e in fitz_entries:
+                _d, _fl = _eff(_e)
+                if groups and groups[-1][1] == _d and groups[-1][2] == _fl:
+                    groups[-1][0].append(_e)
+                else:
+                    groups.append(([_e], _d, _fl))
+
+        total_steps = len(groups) + len(other_entries)
+        if total_steps == 0:
+            return
+
+        worker = PrintWorker(
+            groups=groups,
+            other_entries=other_entries,
+            compose_kwargs=compose_kwargs,
+            printer_name=printer_name,
+            copies=self.copies_spin.value(),
+            grayscale=self.grayscale_check.isChecked(),
+            paper_size=self.config.get("paper_size", "Letter"),
+            parent=self,
+        )
+
+        dlg = QProgressDialog("Preparing print job…", "Cancel", 0, total_steps, self)
+        dlg.setWindowTitle("Printing")
+        dlg.setWindowModality(Qt.WindowModality.WindowModal)
+        dlg.setMinimumDuration(0)
+        dlg.setValue(0)
+
+        result: dict = {}
+
+        def _on_step(current: int, total: int, label: str) -> None:
+            dlg.setLabelText(label)
+            dlg.setValue(current - 1)
+
+        def _on_page(current: int, total: int) -> None:
+            dlg.setLabelText(f"Printing page {current} of {total}…")
+
+        def _on_finished(errors: list, canceled: bool) -> None:
+            result["errors"] = errors
+            result["canceled"] = canceled
+            dlg.setValue(total_steps)
+            dlg.accept()
+
+        def _on_cancel() -> None:
+            dlg.setLabelText("Canceling…")
+            btn = dlg.findChild(QPushButton)
+            if btn:
+                btn.setEnabled(False)
+            worker.cancel()
+
+        worker.step_done.connect(_on_step)
+        worker.page_progress.connect(_on_page)
+        worker.finished_print.connect(_on_finished)
+        dlg.canceled.connect(_on_cancel)
+
+        worker.start()
+        dlg.exec()
+        worker.wait()
+
+        errors = result.get("errors", [])
+        canceled = result.get("canceled", False)
+
+        if errors:
+            QMessageBox.warning(self, "Print Errors", "\n".join(errors))
+        elif canceled:
+            self.status_bar.showMessage("Print job canceled")
+        else:
+            self.status_bar.showMessage(
+                f"Sent {len(self.file_entries)} file(s) to {printer_name}"
+            )
+
+    def _print_manual_duplex(
+        self,
+        fitz_entries: list,
+        other_entries: list,
+        printer_name: str,
+    ) -> None:
+        """Synchronous manual-duplex path (interactive — requires mid-job dialog)."""
+        errors: list[str] = []
+        manual_duplex_canceled = False
+
+        try:
+            if other_entries:
+                raise ValueError(
+                    "Manual duplex is only supported for PDF/image files "
+                    "rendered by Honey Batchr. Remove unsupported files "
+                    "from the queue or turn off manual duplex."
                 )
 
-                if self.manual_duplex_check.isChecked():
-                    if other_entries:
-                        raise ValueError(
-                            "Manual duplex is only supported for PDF/image files "
-                            "rendered by Honey Batchr. Remove unsupported files "
-                            "from the queue or turn off manual duplex."
-                        )
-                    tmp = compose_nup_pdf(fitz_entries, **compose_kwargs)
-                    front_path = None
-                    back_path = None
-                    try:
-                        front_path, back_path = split_for_manual_duplex(
-                            tmp, self._manual_duplex_reverse_back()
-                        )
+            nup = max(1, int(self.pages_per_sheet_combo.currentText())) \
+                if self.mode_tabs.currentIndex() == 2 else 1
+            compose_kwargs = dict(
+                nup=nup,
+                order=self.page_order_combo.currentText(),
+                margin_pts=self.margins_spin.value() * 72 if self.margins_check.isChecked() else 0.0,
+                draw_border=self.print_page_border_check.isChecked() and nup > 1,
+                orientation=self.config.get("page_setting_orientation", "Portrait"),
+                auto_rotate=self.auto_rotate_check.isChecked(),
+                auto_center=self.auto_center_check.isChecked(),
+                paper_size=self.config.get("paper_size", "Letter"),
+                page_margin_left=self.config.get("page_margin_left", 0.02),
+                page_margin_right=self.config.get("page_margin_right", 0.02),
+                page_margin_top=self.config.get("page_margin_top", 0.02),
+                page_margin_bottom=self.config.get("page_margin_bottom", 0.02),
+            )
+
+            tmp = compose_nup_pdf(fitz_entries, **compose_kwargs)
+            front_path = None
+            back_path = None
+            try:
+                front_path, back_path = split_for_manual_duplex(
+                    tmp, self._manual_duplex_reverse_back()
+                )
+                print_pdf_qt(
+                    front_path, printer_name,
+                    copies=self.copies_spin.value(),
+                    grayscale=self.grayscale_check.isChecked(),
+                    duplex=False, flip_long=False,
+                    paper_size=self.config.get("paper_size", "Letter"),
+                )
+                if back_path:
+                    reply = QMessageBox.information(
+                        self,
+                        "Manual Duplex — Reload Paper",
+                        "Front sides have been sent to the printer.\n\n"
+                        + self._manual_duplex_reload_instructions(),
+                        QMessageBox.StandardButton.Ok
+                        | QMessageBox.StandardButton.Cancel,
+                    )
+                    if reply == QMessageBox.StandardButton.Ok:
                         print_pdf_qt(
-                            front_path, printer_name,
+                            back_path, printer_name,
                             copies=self.copies_spin.value(),
                             grayscale=self.grayscale_check.isChecked(),
                             duplex=False, flip_long=False,
                             paper_size=self.config.get("paper_size", "Letter"),
                         )
-                        if back_path:
-                            reply = QMessageBox.information(
-                                self,
-                                "Manual Duplex — Reload Paper",
-                                "Front sides have been sent to the printer.\n\n"
-                                + self._manual_duplex_reload_instructions(),
-                                QMessageBox.StandardButton.Ok
-                                | QMessageBox.StandardButton.Cancel,
-                            )
-                            if reply == QMessageBox.StandardButton.Ok:
-                                print_pdf_qt(
-                                    back_path, printer_name,
-                                    copies=self.copies_spin.value(),
-                                    grayscale=self.grayscale_check.isChecked(),
-                                    duplex=False, flip_long=False,
-                                    paper_size=self.config.get("paper_size", "Letter"),
-                                )
-                            else:
-                                manual_duplex_canceled = True
-                    finally:
-                        for p in (tmp, front_path, back_path):
-                            if p:
-                                try:
-                                    os.unlink(p)
-                                except OSError:
-                                    pass
-                else:
-                    global_duplex = self.duplex_check.isChecked()
-                    global_flip_long = self.flip_long_radio.isChecked()
-
-                    def _eff(e: dict) -> tuple[bool, bool]:
-                        ov = e.get("duplex_override")
-                        if ov is None:
-                            return (global_duplex, global_flip_long)
-                        if not ov:
-                            return (False, True)
-                        return (True, not e.get("flip_short_edge", False))
-
-                    groups: list[tuple[list, bool, bool]] = []
-                    for _e in fitz_entries:
-                        _d, _fl = _eff(_e)
-                        if groups and groups[-1][1] == _d and groups[-1][2] == _fl:
-                            groups[-1][0].append(_e)
-                        else:
-                            groups.append(([_e], _d, _fl))
-
-                    all_tmps: list[str] = []
-                    try:
-                        for group_entries, _d, _fl in groups:
-                            g_tmp = compose_nup_pdf(group_entries, **compose_kwargs)
-                            all_tmps.append(g_tmp)
-                            print_pdf_qt(
-                                g_tmp, printer_name,
-                                copies=self.copies_spin.value(),
-                                grayscale=self.grayscale_check.isChecked(),
-                                duplex=_d, flip_long=_fl,
-                                paper_size=self.config.get("paper_size", "Letter"),
-                            )
-                    finally:
-                        for p in all_tmps:
-                            try:
-                                os.unlink(p)
-                            except OSError:
-                                pass
-            except Exception as e:
-                errors.append(f"Rendered print failed: {e}")
-
-        if other_entries:
-            if sys.platform == "win32":
-                try:
-                    import win32api
-                    safe_name = printer_name.replace('"', '')
-                    for entry in other_entries:
-                        if os.path.exists(entry["path"]):
-                            win32api.ShellExecute(
-                                0, "printto", entry["path"],
-                                f'"{safe_name}"', ".", 0
-                            )
-                except Exception as e:
-                    errors.append(f"ShellExecute print failed: {e}")
-            else:
-                import subprocess
-                for entry in other_entries:
-                    path = entry["path"]
-                    if not os.path.exists(path):
-                        continue
-                    try:
-                        subprocess.run(
-                            ["lp", "-d", printer_name, path],
-                            check=True,
-                            capture_output=True,
-                        )
-                    except FileNotFoundError:
-                        errors.append(
-                            "lp command not found. Install CUPS to print non-PDF files on Linux."
-                        )
-                        break
-                    except subprocess.CalledProcessError as e:
-                        errors.append(
-                            f"lp failed for {os.path.basename(path)}: "
-                            f"{e.stderr.decode(errors='replace').strip()}"
-                        )
+                    else:
+                        manual_duplex_canceled = True
+            finally:
+                for p in (tmp, front_path, back_path):
+                    if p:
+                        try:
+                            os.unlink(p)
+                        except OSError:
+                            pass
+        except Exception as e:
+            errors.append(f"Rendered print failed: {e}")
 
         if errors:
             QMessageBox.warning(self, "Print Errors", "\n".join(errors))

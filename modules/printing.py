@@ -5,6 +5,10 @@ import sys
 import math
 import tempfile
 
+
+class PrintCanceledError(Exception):
+    """Raised when the user cancels a print job."""
+
 from PyQt6.QtWidgets import QComboBox
 
 from modules.utils import parse_page_range, slot_to_grid
@@ -289,6 +293,8 @@ def print_pdf_qt(
     duplex: bool,
     flip_long: bool,
     paper_size: str = "Letter",
+    cancel_check=None,
+    page_progress=None,
 ) -> None:
     """Print a composed PDF via QPrinter/QPainter."""
     import fitz  # type: ignore[import]
@@ -349,7 +355,14 @@ def print_pdf_qt(
         dh = device.height() if device else 2339
         render_dpi = min(printer.resolution(), 300)
 
-        for i in range(len(doc)):
+        total_pages = len(doc)
+        for i in range(total_pages):
+            if cancel_check and cancel_check():
+                printer.abort()
+                doc.close()
+                raise PrintCanceledError()
+            if page_progress:
+                page_progress(i + 1, total_pages)
             page = doc[i]
             if i > 0:
                 printer.newPage()
