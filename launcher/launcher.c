@@ -1,5 +1,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <wchar.h>
 
 /* GUI launcher — no console window.
    Resolves paths relative to its own location so the install can live anywhere. */
@@ -10,10 +11,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     wchar_t *last = wcsrchr(base, L'\\');
     if (last) *last = L'\0';
 
+    /* Build: "<base>\runtime\python.exe" "<base>\app\main.py" */
     wchar_t cmd[MAX_PATH * 3];
-    _snwprintf(cmd, MAX_PATH * 3,
-               L"\"%s\\runtime\\python.exe\" \"%s\\app\\main.py\"",
-               base, base);
+    wcscpy(cmd, L"\"");
+    wcscat(cmd, base);
+    wcscat(cmd, L"\\runtime\\python.exe\" \"");
+    wcscat(cmd, base);
+    wcscat(cmd, L"\\app\\main.py\"");
 
     STARTUPINFOW        si = {sizeof(si)};
     PROCESS_INFORMATION pi = {0};
