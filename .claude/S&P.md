@@ -206,6 +206,19 @@ Review this file before making changes to the codebase.
 
 ---
 
+## 2026-05-11 — `modules/printing.py` (PR #32 follow-up — feat/progress-bar-cancel)
+
+**Review:** CodeRabbit follow-up — 1 nitpick.
+**Result:** Fixed.
+
+### Findings
+
+1. **Exception class defined before imports**
+   - `PrintCanceledError` was defined between the stdlib imports and the third-party imports, violating PEP 8
+   - Fix: move class definition to after all imports
+
+---
+
 ## 2026-05-11 — `modules/app.py` + `modules/printing.py` (PR #32 — feat/progress-bar-cancel)
 
 **Review:** CodeRabbit review of async print worker with progress/cancel — 2 actionable + 1 nitpick.
