@@ -38,6 +38,7 @@ QTableWidget {
     border: 1px solid #b0b0b0;
     gridline-color: #e0e0e0;
     selection-background-color: #cce0ff;
+    selection-color: #000000;
     alternate-background-color: #f7f7f7;
 }
 QHeaderView::section {
