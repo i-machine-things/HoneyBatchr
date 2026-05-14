@@ -1,4 +1,4 @@
-# Honey Batchr
+# HoneyBatchr
 
 A batch printing application built with PyQt6. Matches the Adobe Acrobat Batch Print layout with N-up composition, per-file page configuration, live PDF preview, and theme switching. Runs on Windows and Linux.
 

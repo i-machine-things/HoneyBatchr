@@ -903,7 +903,7 @@ class BatchPrintApp(QMainWindow):
             update_act.triggered.connect(self.check_for_updates)
             help_menu.addAction(update_act)
             help_menu.addSeparator()
-            about_act = QAction("About Honey Batchr", self)
+            about_act = QAction("About HoneyBatchr", self)
             about_act.triggered.connect(self._show_about)
             help_menu.addAction(about_act)
 
@@ -972,7 +972,7 @@ class BatchPrintApp(QMainWindow):
     def _show_about(self):
         QMessageBox.information(
             self, "About",
-            f"Honey Batchr\nBatch printing made simple.\n\nVersion: {APP_VERSION}",
+            f"HoneyBatchr\nBatch printing made simple.\n\nVersion: {APP_VERSION}",
         )
 
     # ── Update checking ────────────────────────────────────────────────────────
@@ -991,7 +991,7 @@ class BatchPrintApp(QMainWindow):
         checker = UpdateChecker(self)
         checker.update_available.connect(self._on_update_available_manual)
         checker.up_to_date.connect(
-            lambda: QMessageBox.information(self, "Up to Date", "Honey Batchr is up to date.")
+            lambda: QMessageBox.information(self, "Up to Date", "HoneyBatchr is up to date.")
         )
         checker.check_failed.connect(
             lambda msg: QMessageBox.warning(self, "Update Check Failed",
@@ -1409,7 +1409,7 @@ class BatchPrintApp(QMainWindow):
             if other_entries:
                 raise ValueError(
                     "Manual duplex is only supported for PDF/image files "
-                    "rendered by Honey Batchr. Remove unsupported files "
+                    "rendered by HoneyBatchr. Remove unsupported files "
                     "from the queue or turn off manual duplex."
                 )
 
